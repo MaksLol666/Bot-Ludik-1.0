@@ -6,7 +6,6 @@ from aiogram.fsm.state import State, StatesGroup
 
 from database import db
 from handlers.status import update_user_status
-from handlers.glc import check_win_streak
 from handlers.daily_quests import update_quest_progress
 from config import MIN_BET, MAX_BET
 
@@ -57,6 +56,10 @@ async def start_mines(message: Message, state: FSMContext):
     
     if bet > user['balance_lc']:
         await message.answer("❌ Недостаточно средств!")
+        return
+    
+    if bet > MAX_BET:
+        await message.answer(f"❌ Максимальная ставка: {MAX_BET} LC")
         return
     
     await db.update_balance(user_id, -bet)
@@ -202,6 +205,7 @@ async def open_cell(callback: CallbackQuery, state: FSMContext):
         
         await db.add_game_stat(user_id, "mines", False, bet, 0)
         await update_user_status(user_id)
+        await update_quest_progress(user_id, "mines", 1)
         
         await state.clear()
         await callback.answer()
@@ -235,10 +239,7 @@ async def cashout(callback: CallbackQuery, state: FSMContext):
     await db.update_balance(user_id, win_amount)
     await db.add_game_stat(user_id, "mines", True, bet, win_amount)
     await update_user_status(user_id)
-    await check_win_streak(user_id, "mines")
-    
-    await update_quest_progress(user_id, "mines_wins", 1)
-    await update_quest_progress(user_id, "total_bets", 1)
+    await update_quest_progress(user_id, "mines", 1)
     
     await callback.message.edit_text(
         f"💰 <b>Ты забрал выигрыш!</b>\n\n"
@@ -247,8 +248,6 @@ async def cashout(callback: CallbackQuery, state: FSMContext):
         f"💎 Выигрыш: +{win_amount} LC\n\n"
         f"✅ Игра завершена"
     )
-    
-    await update_quest_progress(user_id, "mines_bets", 1)
     
     await state.clear()
     await callback.answer()
@@ -268,10 +267,9 @@ async def exit_game(callback: CallbackQuery, state: FSMContext):
         
         await db.add_game_stat(user_id, "mines", False, bet, 0)
         await update_user_status(user_id)
+        await update_quest_progress(user_id, "mines", 1)
     else:
         await callback.message.edit_text("👋 Игра завершена")
-    
-    await update_quest_progress(user_id, "mines_bets", 1)
     
     await state.clear()
     await callback.answer()
