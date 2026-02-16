@@ -3,7 +3,7 @@ from aiogram.types import Message, CallbackQuery
 from aiogram.filters import Command
 from aiogram.enums import ChatMemberStatus
 
-from config import CHANNEL_ID, CHANNEL_LINK, CHAT_LINK, ADMIN_USERNAME, BOT_VERSION, BOT_RELEASE_DATE
+from config import CHANNEL_ID, CHANNEL_LINK, ADMIN_USERNAME, BOT_VERSION, BOT_RELEASE_DATE
 from database import db
 from keyboards.inline import get_start_keyboard, get_main_menu
 
@@ -15,6 +15,7 @@ async def cmd_start(message: Message):
     username = message.from_user.username or "NoUsername"
     first_name = message.from_user.first_name
     
+    # Обработка реферальной ссылки
     args = message.text.split()
     referrer_id = None
     if len(args) > 1 and args[1].startswith("ref_"):
@@ -35,8 +36,7 @@ async def cmd_start(message: Message):
             f"Мир азарта и больших выигрышей ждет тебя! 🎲\n\n"
             f"👑 Владелец: {ADMIN_USERNAME}\n"
             f"📅 Релиз: {BOT_RELEASE_DATE}\n"
-            f"📊 Версия: {BOT_VERSION}\n"
-            f"💬 Чат: {CHAT_LINK}\n\n"
+            f"📊 Версия: {BOT_VERSION}\n\n"
             f"👇 Выбери действие в меню ниже:"
         )
         
@@ -64,10 +64,12 @@ async def cmd_start(message: Message):
         
         await message.answer(
             f"🎲 <b>С возвращением, {first_name}!</b>\n\n"
-            f"💰 Твой баланс: {user['balance_lc']} #LC\n"
+            f"💰 Твой баланс: {user['balance_lc']} #LC",
             f"💎 GLC: {user['balance_glc']}",
             reply_markup=get_main_menu()
         )
+
+# ... остальной код без изменений ...
 
 @router.message(Command("play"))
 async def cmd_play(message: Message):
