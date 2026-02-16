@@ -32,10 +32,11 @@ def get_main_menu() -> InlineKeyboardMarkup:
     )
     builder.row(
         InlineKeyboardButton(text="👥 Рефералы", callback_data="referral_menu"),
-        InlineKeyboardButton(text="ℹ️ Инфо", callback_data="info")
+        InlineKeyboardButton(text="💰 GLC", callback_data="glc_info")
     )
     builder.row(
-        InlineKeyboardButton(text="💰 GLC", callback_data="glc_info")
+        InlineKeyboardButton(text="📋 Квесты", callback_data="daily_quests"),
+        InlineKeyboardButton(text="ℹ️ Инфо", callback_data="info")
     )
     return builder.as_markup()
 
@@ -54,16 +55,13 @@ def get_casino_menu() -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 def get_roulette_keyboard() -> InlineKeyboardMarkup:
-    """Клавиатура для рулетки (цвета и числа)"""
+    """Клавиатура для рулетки"""
     builder = InlineKeyboardBuilder()
-    
-    # Цвета
     builder.row(
         InlineKeyboardButton(text="🔴 КРАСНОЕ", callback_data="roulette_red"),
         InlineKeyboardButton(text="⚫ ЧЕРНОЕ", callback_data="roulette_black")
     )
     
-    # Числа (ряды)
     numbers_row1 = []
     for i in range(1, 13):
         numbers_row1.append(InlineKeyboardButton(text=str(i), callback_data=f"roulette_num_{i}"))
@@ -79,7 +77,6 @@ def get_roulette_keyboard() -> InlineKeyboardMarkup:
         numbers_row3.append(InlineKeyboardButton(text=str(i), callback_data=f"roulette_num_{i}"))
     builder.row(*numbers_row3)
     
-    # Ноль и назад
     builder.row(
         InlineKeyboardButton(text="0️⃣ НОЛЬ", callback_data="roulette_num_0"),
         InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_casino")
@@ -103,6 +100,22 @@ def get_business_menu() -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="📊 Мой бизнес", callback_data="my_business")
     )
     builder.row(InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_main"))
+    return builder.as_markup()
+
+def get_daily_quests_keyboard(quests: list) -> InlineKeyboardMarkup:
+    """Клавиатура для ежедневных квестов"""
+    builder = InlineKeyboardBuilder()
+    
+    for quest in quests:
+        if quest['completed'] and not quest['claimed']:
+            builder.row(InlineKeyboardButton(
+                text=f"🎁 Забрать {quest['reward_lc']} LC + {quest['reward_glc']} GLC",
+                callback_data=f"claim_quest_{quest['id']}"
+            ))
+    
+    builder.row(InlineKeyboardButton(text="🔄 Обновить", callback_data="daily_quests"))
+    builder.row(InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_main"))
+    
     return builder.as_markup()
 
 def get_back_button() -> InlineKeyboardMarkup:
