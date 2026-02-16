@@ -1,20 +1,20 @@
 from aiogram import Router, F
 from aiogram.types import CallbackQuery
-from aiogram.utils.deep_link import create_start_link
+from aiogram.utils.link import create_telegram_link  # <-- ИЗМЕНЕНИЕ ЗДЕСЬ
 
 from database import db
-from handlers.glc import add_glc
-from handlers.achievements import check_achievement
 from keyboards.inline import get_back_button
 
 router = Router()
 
 @router.callback_query(F.data == "referral_menu")
 async def referral_menu(callback: CallbackQuery):
+    """Меню реферальной системы"""
     user_id = callback.from_user.id
     
-    bot = callback.bot
-    deep_link = await create_start_link(bot, f"ref_{user_id}", encode=True)
+    # Создаем реферальную ссылку (новый способ в aiogram 3.x)
+    bot_username = (await callback.bot.me()).username
+    deep_link = create_telegram_link(bot_username, start=f"ref_{user_id}")
     
     pool = await db.get_pool()
     async with pool.acquire() as conn:
@@ -33,10 +33,10 @@ async def referral_menu(callback: CallbackQuery):
         f"📊 Твоя статистика:\n"
         f"👤 Приглашено: {ref_count} чел.\n"
         f"💰 Донатов рефералов: {total_donat} ₽\n"
-        f"💎 Твой бонус: {total_donat * 10} LC + {ref_count * 100} GLC\n\n"
+        f"💎 Твой бонус: {total_donat * 10} LC (10%)\n\n"
         f"🔗 Твоя ссылка:\n"
         f"<code>{deep_link}</code>\n\n"
-        f"За каждого приглашенного ты получаешь 1000 LC и 100 GLC\n"
+        f"За каждого приглашенного ты получаешь 1000 LC\n"
         f"Если реферал донатит, ты получаешь 10% от его доната в LC"
     )
     
@@ -44,6 +44,7 @@ async def referral_menu(callback: CallbackQuery):
     await callback.answer()
 
 async def add_referral_donat(referral_id: int, donat_amount: int):
+    """Добавить донат реферала и начислить бонус пригласившему"""
     pool = await db.get_pool()
     async with pool.acquire() as conn:
         ref = await conn.fetchrow(
@@ -60,17 +61,8 @@ async def add_referral_donat(referral_id: int, donat_amount: int):
                 WHERE referral_id = $2
             """, donat_amount, referral_id)
             
-            bonus = donat_amount * 10
+            bonus = donat_amount * 10  # 10% от доната в LC
             await db.update_balance(referrer_id, bonus)
-            
-            # Проверяем достижение популярности
-            ref_count = await conn.fetchval(
-                "SELECT COUNT(*) FROM referrals WHERE referrer_id = $1",
-                referrer_id
-            ) or 0
-            
-            from handlers.achievements import check_achievement
-            await check_achievement(referrer_id, "popular", ref_count)
             
             return referrer_id, bonus
     
