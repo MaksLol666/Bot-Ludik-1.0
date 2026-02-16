@@ -4,12 +4,12 @@ import random
 
 from database import db
 from handlers.status import update_user_status
-from handlers.glc import check_win_streak
-from handlers.daily_quests import update_quest_progress
-from keyboards.inline import get_casino_menu, get_back_button, get_roulette_keyboard
-from config import MIN_BET, MAX_BET, CHANNEL_ID
+from keyboards.inline import get_casino_menu, get_back_button  # Убрали get_roulette_keyboard
+from config import MIN_BET, MAX_BET
 
 router = Router()
+
+# ... остальной код ...
 
 # Словарь для временных данных игры
 user_game_data = {}
