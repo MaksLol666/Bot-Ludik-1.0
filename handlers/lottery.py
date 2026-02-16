@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 
 from database import db
 from handlers.status import update_user_status
-from handlers.achievements import check_achievement
+from handlers.daily_quests import update_quest_progress
 from keyboards.inline import get_back_button
 
 router = Router()
@@ -138,6 +138,8 @@ async def buy_lottery_tickets(message: Message):
                 WHERE week_number = $1
             """, current_week)
     
+    await update_quest_progress(user_id, "lottery", count)
+    
     await message.answer(
         f"✅ <b>Билеты куплены!</b>\n\n"
         f"🎫 Куплено: {count} шт.\n"
@@ -233,7 +235,7 @@ async def draw_lottery(bot):
                 winner['prize']
             )
             await update_user_status(winner['user_id'])
-            await check_achievement(winner['user_id'], "lucky", 1)
+            await update_quest_progress(winner['user_id'], "lottery", 1)
             
             results_text += f"{PRIZE_NAMES[winner['place']]}: @{username} — {winner['prize']} LC\n"
         
@@ -247,6 +249,7 @@ async def draw_lottery(bot):
                     0
                 )
                 await update_user_status(p['user_id'])
+                await update_quest_progress(p['user_id'], "lottery", 1)
         
         winners_str = ", ".join([f"@{w['user_id']}" for w in winners])
         await conn.execute("""
