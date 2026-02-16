@@ -6,7 +6,6 @@ from aiogram.fsm.state import State, StatesGroup
 
 from database import db
 from handlers.status import update_user_status
-from handlers.glc import check_win_streak
 from handlers.daily_quests import update_quest_progress
 from config import MIN_BET, MAX_BET
 
@@ -47,6 +46,10 @@ async def create_duel(message: Message, state: FSMContext):
     
     if bet > user['balance_lc']:
         await message.answer("❌ Недостаточно средств!")
+        return
+    
+    if bet > MAX_BET:
+        await message.answer(f"❌ Максимальная ставка: {MAX_BET} LC")
         return
     
     duel_id = f"{user_id}_{message.message_id}"
@@ -126,29 +129,23 @@ async def accept_duel(callback: CallbackQuery, state: FSMContext):
         winner_name = duel['creator_name']
         win_amount = duel['bet'] * 2
         await db.update_balance(winner_id, win_amount)
-        await db.add_game_stat(winner_id, "dice_duel", True, duel['bet'], win_amount)
-        await db.add_game_stat(opponent_id, "dice_duel", False, duel['bet'], 0)
+        await db.add_game_stat(winner_id, "dice", True, duel['bet'], win_amount)
+        await db.add_game_stat(opponent_id, "dice", False, duel['bet'], 0)
         await update_user_status(winner_id)
         await update_user_status(opponent_id)
-        await check_win_streak(winner_id, "dice_duel")
-        
-        await update_quest_progress(winner_id, "dice_wins", 1)
-        
-        result_text = f"🏆 <b>ПОБЕДИТЕЛЬ: {winner_name}</b>\n💰 Выигрыш: +{win_amount} LC"
+        await update_quest_progress(winner_id, "dice", 1)
+        await update_quest_progress(opponent_id, "dice", 1)
     elif opponent_roll > creator_roll:
         winner_id = opponent_id
         winner_name = duel['opponent_name']
         win_amount = duel['bet'] * 2
         await db.update_balance(winner_id, win_amount)
-        await db.add_game_stat(winner_id, "dice_duel", True, duel['bet'], win_amount)
-        await db.add_game_stat(duel['creator'], "dice_duel", False, duel['bet'], 0)
+        await db.add_game_stat(winner_id, "dice", True, duel['bet'], win_amount)
+        await db.add_game_stat(duel['creator'], "dice", False, duel['bet'], 0)
         await update_user_status(winner_id)
         await update_user_status(duel['creator'])
-        await check_win_streak(winner_id, "dice_duel")
-        
-        await update_quest_progress(winner_id, "dice_wins", 1)
-        
-        result_text = f"🏆 <b>ПОБЕДИТЕЛЬ: {winner_name}</b>\n💰 Выигрыш: +{win_amount} LC"
+        await update_quest_progress(winner_id, "dice", 1)
+        await update_quest_progress(duel['creator'], "dice", 1)
     else:
         await db.update_balance(duel['creator'], duel['bet'])
         await db.update_balance(opponent_id, duel['bet'])
@@ -164,16 +161,12 @@ async def accept_duel(callback: CallbackQuery, state: FSMContext):
         await callback.answer()
         return
     
-    await update_quest_progress(duel['creator'], "dice_bets", 1)
-    await update_quest_progress(opponent_id, "dice_bets", 1)
-    await update_quest_progress(duel['creator'], "total_bets", 1)
-    await update_quest_progress(opponent_id, "total_bets", 1)
-    
     result_text = (
         f"🎲 <b>ДУЭЛЬ ЗАВЕРШЕНА!</b>\n\n"
         f"👤 {duel['creator_name']}: {creator_roll}\n"
         f"👤 {duel['opponent_name']}: {opponent_roll}\n\n"
-        f"{result_text}"
+        f"🏆 <b>ПОБЕДИТЕЛЬ: {winner_name}</b>\n"
+        f"💰 Выигрыш: +{win_amount} LC"
     )
     
     await callback.message.edit_text(result_text)
