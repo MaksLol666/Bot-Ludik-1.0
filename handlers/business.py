@@ -1,0 +1,162 @@
+from aiogram import Router, F
+from aiogram.types import CallbackQuery
+import datetime
+
+from database import db
+from keyboards.inline import get_business_menu, get_back_button
+
+router = Router()
+
+BUSINESS_TYPES = {
+    "small": {"price": 20000, "daily": 2500, "name": "Малый бизнес"},
+    "medium": {"price": 50000, "daily": 5500, "name": "Средний бизнес"},
+    "large": {"price": 100000, "daily": 10500, "name": "Крупный бизнес"},
+    "paid": {"price": 500, "daily": 50000, "name": "💎 Богатый бизнес", "donat": True}
+}
+
+@router.callback_query(F.data == "business_menu")
+async def business_menu(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    
+    pool = await db.get_pool()
+    async with pool.acquire() as conn:
+        business = await conn.fetchrow(
+            "SELECT * FROM business WHERE user_id = $1",
+            user_id
+        )
+    
+    text = "💼 <b>Бизнес система</b>\n\n"
+    
+    if business:
+        biz = BUSINESS_TYPES.get(business['business_type'], {})
+        text += f"✅ У тебя есть: {biz.get('name', 'Unknown')}\n"
+        
+        if business['last_collected']:
+            last = business['last_collected']
+            now = datetime.datetime.now()
+            delta = now - last
+            
+            if delta.total_seconds() >= 86400:
+                text += "💰 Доступен сбор дохода!"
+            else:
+                hours_left = 24 - (delta.total_seconds() / 3600)
+                text += f"⏳ Следующий сбор через: {hours_left:.1f} ч."
+    else:
+        text += "У тебя пока нет бизнеса.\nКупи один из вариантов ниже:"
+    
+    await callback.message.edit_text(text, reply_markup=get_business_menu())
+    await callback.answer()
+
+@router.callback_query(F.data.startswith("buy_business_"))
+async def buy_business(callback: CallbackQuery):
+    biz_type = callback.data.replace("buy_business_", "")
+    user_id = callback.from_user.id
+    
+    if biz_type not in BUSINESS_TYPES:
+        await callback.answer("❌ Неверный тип бизнеса")
+        return
+    
+    biz = BUSINESS_TYPES[biz_type]
+    user = await db.get_user(user_id)
+    
+    if biz.get("donat"):
+        await callback.answer("💎 Это платный бизнес за 500₽. Оплата через админа.", show_alert=True)
+        return
+    
+    if user['balance_lc'] < biz['price']:
+        await callback.answer(f"❌ Недостаточно средств! Нужно {biz['price']} LC", show_alert=True)
+        return
+    
+    pool = await db.get_pool()
+    async with pool.acquire() as conn:
+        existing = await conn.fetchrow(
+            "SELECT * FROM business WHERE user_id = $1",
+            user_id
+        )
+        
+        if existing:
+            await callback.answer("❌ У тебя уже есть бизнес!", show_alert=True)
+            return
+        
+        async with conn.transaction():
+            await db.update_balance(user_id, -biz['price'])
+            await conn.execute("""
+                INSERT INTO business (user_id, business_type, last_collected)
+                VALUES ($1, $2, NOW())
+            """, user_id, biz_type)
+    
+    await callback.answer(f"✅ Бизнес '{biz['name']}' куплен!", show_alert=True)
+    await business_menu(callback)
+
+@router.callback_query(F.data == "collect_business")
+async def collect_business(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    
+    pool = await db.get_pool()
+    async with pool.acquire() as conn:
+        business = await conn.fetchrow(
+            "SELECT * FROM business WHERE user_id = $1",
+            user_id
+        )
+    
+    if not business:
+        await callback.answer("❌ У тебя нет бизнеса!", show_alert=True)
+        return
+    
+    biz = BUSINESS_TYPES.get(business['business_type'])
+    if not biz:
+        await callback.answer("❌ Ошибка бизнеса")
+        return
+    
+    last = business['last_collected']
+    now = datetime.datetime.now()
+    
+    if last and (now - last).total_seconds() < 86400:
+        await callback.answer("⏳ Еще не прошло 24 часа!", show_alert=True)
+        return
+    
+    async with pool.acquire() as conn:
+        await conn.execute("""
+            UPDATE business SET last_collected = NOW() WHERE user_id = $1
+        """, user_id)
+    
+    await db.update_balance(user_id, biz['daily'])
+    
+    await callback.answer(f"💰 Собрано: {biz['daily']} LC!", show_alert=True)
+    await business_menu(callback)
+
+@router.callback_query(F.data == "my_business")
+async def my_business(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    
+    pool = await db.get_pool()
+    async with pool.acquire() as conn:
+        business = await conn.fetchrow(
+            "SELECT * FROM business WHERE user_id = $1",
+            user_id
+        )
+    
+    if not business:
+        await callback.answer("❌ У тебя нет бизнеса", show_alert=True)
+        return
+    
+    biz = BUSINESS_TYPES.get(business['business_type'])
+    last = business['last_collected']
+    now = datetime.datetime.now()
+    delta = now - last
+    hours_passed = delta.total_seconds() / 3600
+    
+    text = (
+        f"💼 <b>Мой бизнес</b>\n\n"
+        f"🏢 Тип: {biz['name']}\n"
+        f"💰 Инвестировано: {biz['price']} LC\n"
+        f"📈 Доход в день: +{biz['daily']} LC\n\n"
+        f"⏱ Последний сбор: {last.strftime('%Y-%m-%d %H:%M')}\n"
+        f"⌛️ Прошло: {hours_passed:.1f} ч.\n"
+    )
+    
+    if hours_passed >= 24:
+        text += "\n✅ Можно собирать доход!"
+    
+    await callback.message.edit_text(text, reply_markup=get_back_button())
+    await callback.answer()
