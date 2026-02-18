@@ -2,7 +2,7 @@ from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
 from aiogram.filters import Command
 
-from database import db
+from database_sqlite import db
 from handlers.glc import add_glc
 from keyboards.inline import get_back_button
 
