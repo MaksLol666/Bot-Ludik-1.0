@@ -1,5 +1,5 @@
 from aiogram import Router
-from database import db
+from database_sqlite import db
 
 router = Router()
 
