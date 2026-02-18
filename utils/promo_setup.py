@@ -1,18 +1,18 @@
 from database_sqlite import db
 
-def create_start_promos():
-    """Создание стартовых промокодов (теперь обычная функция)"""
-    conn = db.get_connection()
-    cursor = conn.cursor()
+async def create_start_promos():
+    """Создание стартовых промокодов (АСИНХРОННАЯ)"""
+    conn = await db.get_connection()
     
-    cursor.execute("""
+    await conn.execute("""
         INSERT OR IGNORE INTO promocodes (code, reward, max_uses)
         VALUES (?, ?, ?)
     """, ("NEW", 2500, 1))
     
-    cursor.execute("""
+    await conn.execute("""
         INSERT OR IGNORE INTO promocodes (code, reward, max_uses)
         VALUES (?, ?, ?)
     """, ("mëpтв", 25000, 25))
     
-    conn.commit()
+    await conn.commit()
+    print("✅ Стартовые промокоды созданы")
