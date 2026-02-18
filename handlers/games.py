@@ -2,7 +2,7 @@ from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
 import random
 
-from database import db
+from database_sqlite import db
 from handlers.status import update_user_status
 from handlers.daily_quests import update_quest_progress
 from keyboards.inline import get_casino_menu, get_back_button
