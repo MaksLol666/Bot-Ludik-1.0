@@ -2,7 +2,7 @@ from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
 from aiogram.filters import Command
 
-from database import db
+from database_sqlite import db
 from config import ADMIN_USERNAME, ADMIN_IDS
 from handlers.referral import add_referral_donat
 from handlers.live_stats import track_donation
