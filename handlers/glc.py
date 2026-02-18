@@ -3,7 +3,7 @@ from aiogram.types import Message, CallbackQuery
 from aiogram.filters import Command
 import random
 
-from database import db
+from database_sqlite import db
 from keyboards.inline import get_back_button
 
 router = Router()
