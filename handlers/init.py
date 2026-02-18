@@ -12,12 +12,10 @@ from . import donate
 from . import bonus
 from . import referral
 from . import admin
-from . import glc
-from . import daily_quests
+from . import transfers  # Добавили
 
 __all__ = [
     'start', 'games', 'dice_duel', 'mines', 'lottery',
     'profile', 'top', 'status', 'promo', 'business',
-    'donate', 'bonus', 'referral', 'admin', 'glc',
-    'daily_quests'
+    'donate', 'bonus', 'referral', 'admin', 'transfers'
 ]
