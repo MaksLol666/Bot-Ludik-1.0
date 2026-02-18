@@ -19,12 +19,10 @@ logger = logging.getLogger(__name__)
 
 async def on_startup(bot: Bot):
     logger.info("Запуск бота...")
-    # db уже инициализирован, таблицы создадутся автоматически
     
-    # Создаем стартовые промокоды
-    create_start_promos()  # Теперь это обычная функция
+    # Добавить await!
+    await create_start_promos()  # БЫЛО: create_start_promos()
     
-    # Планировщик для лотереи
     scheduler = AsyncIOScheduler()
     scheduler.add_job(
         lottery.draw_lottery, 
