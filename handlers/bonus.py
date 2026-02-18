@@ -3,7 +3,7 @@ from aiogram.types import CallbackQuery
 from datetime import datetime
 import random
 
-from database import db
+from database_sqlite import db
 from handlers.glc import add_glc
 from config import BONUS_MIN, BONUS_MAX, BONUS_COOLDOWN
 
