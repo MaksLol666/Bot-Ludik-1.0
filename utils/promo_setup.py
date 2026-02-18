@@ -1,16 +1,18 @@
-from database import db
+from database_sqlite import db
 
-async def create_start_promos():
-    pool = await db.get_pool()
-    async with pool.acquire() as conn:
-        await conn.execute("""
-            INSERT INTO promocodes (code, reward, max_uses)
-            VALUES ($1, $2, $3)
-            ON CONFLICT (code) DO NOTHING
-        """, "NEW", 2500, 1)
-        
-        await conn.execute("""
-            INSERT INTO promocodes (code, reward, max_uses)
-            VALUES ($1, $2, $3)
-            ON CONFLICT (code) DO NOTHING
-        """, "mëpтв", 25000, 25)
+def create_start_promos():
+    """Создание стартовых промокодов (теперь обычная функция)"""
+    conn = db.get_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute("""
+        INSERT OR IGNORE INTO promocodes (code, reward, max_uses)
+        VALUES (?, ?, ?)
+    """, ("NEW", 2500, 1))
+    
+    cursor.execute("""
+        INSERT OR IGNORE INTO promocodes (code, reward, max_uses)
+        VALUES (?, ?, ?)
+    """, ("mëpтв", 25000, 25))
+    
+    conn.commit()
