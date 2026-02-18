@@ -4,7 +4,7 @@ from aiogram.filters import Command
 from datetime import datetime
 import random
 
-from database import db
+from database_sqlite import db
 from handlers.glc import add_glc
 from keyboards.inline import get_back_button, get_daily_quests_keyboard
 
