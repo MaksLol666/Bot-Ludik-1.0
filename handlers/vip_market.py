@@ -2,7 +2,7 @@ from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
 from aiogram.filters import Command
 
-from database import db
+from database_sqlite import db
 from handlers.status import get_user_status, update_user_status
 from handlers.achievements import check_achievement
 from keyboards.inline import get_back_button, get_vip_market_keyboard
