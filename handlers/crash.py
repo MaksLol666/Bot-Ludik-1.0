@@ -3,7 +3,7 @@ from aiogram.types import Message, CallbackQuery
 import random
 import asyncio
 
-from database import db
+from database_sqlite import db
 from handlers.status import update_user_status
 from handlers.glc import check_win_streak
 from handlers.daily_quests import update_quest_progress
