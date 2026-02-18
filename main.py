@@ -7,10 +7,10 @@ from aiogram.enums import ParseMode
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from config import BOT_TOKEN
-from database import db
+from database_sqlite import db  # Импортируем SQLite версию
 from handlers import (
     start, games, dice_duel, mines, lottery, profile, top, status,
-    promo, business, donate, bonus, referral, admin, glc, daily_quests
+    promo, business, donate, bonus, referral, admin, transfers  # Добавили transfers
 )
 from utils.promo_setup import create_start_promos
 
@@ -19,10 +19,12 @@ logger = logging.getLogger(__name__)
 
 async def on_startup(bot: Bot):
     logger.info("Запуск бота...")
-    await db.connect()
-    await create_start_promos()
-    await daily_quests.init_quests_table()  # Добавить
+    # db уже инициализирован, таблицы создадутся автоматически
     
+    # Создаем стартовые промокоды
+    create_start_promos()  # Теперь это обычная функция
+    
+    # Планировщик для лотереи
     scheduler = AsyncIOScheduler()
     scheduler.add_job(
         lottery.draw_lottery, 
@@ -38,7 +40,7 @@ async def on_startup(bot: Bot):
 
 async def on_shutdown():
     logger.info("Остановка бота...")
-    await db.close()
+    # Для SQLite не нужно закрывать соединение
     logger.info("Бот остановлен")
 
 async def main():
@@ -48,6 +50,7 @@ async def main():
     )
     dp = Dispatcher(storage=MemoryStorage())
     
+    # Роутеры
     dp.include_router(start.router)
     dp.include_router(games.router)
     dp.include_router(dice_duel.router)
@@ -62,8 +65,7 @@ async def main():
     dp.include_router(bonus.router)
     dp.include_router(referral.router)
     dp.include_router(admin.router)
-    dp.include_router(glc.router)
-    dp.include_router(daily_quests.router)  # Добавить
+    dp.include_router(transfers.router)  # Новый роутер для переводов
     
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
