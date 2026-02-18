@@ -2,7 +2,7 @@ from aiogram import Router, F
 from aiogram.types import CallbackQuery
 from aiogram.utils.link import create_telegram_link  # <-- ИЗМЕНЕНИЕ ЗДЕСЬ
 
-from database import db
+from database_sqlite import db
 from keyboards.inline import get_back_button
 
 router = Router()
