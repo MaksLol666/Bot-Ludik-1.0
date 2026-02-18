@@ -4,7 +4,7 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
-from database import db
+from database_sqlite import db
 from keyboards.inline import get_back_button
 
 router = Router()
