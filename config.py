@@ -1,19 +1,18 @@
 import os
+from dotenv import load_dotenv
 
-# ВРЕМЕННО - токен прямо здесь
-BOT_TOKEN = "7578048091:AAF1jFkII4yA29bmVU9EpObpErqjpBcSLDM"
+load_dotenv()
 
-# Проверка
-if not BOT_TOKEN:
-    raise ValueError("❌ Токен не указан!")
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 ADMIN_IDS = [1691654877]
 ADMIN_USERNAME = "@CIM_KAPTbI_BIO"
 
-# Эти переменные можно тоже указать прямо здесь
-CHANNEL_ID = "@BotLudik_chanels"
-CHANNEL_LINK = "https://t.me/BotLudik_chanels"
-DATABASE_URL = "postgresql://postgres:postgres@localhost/ludik_db"
+CHANNEL_ID = os.getenv("CHANNEL_ID")
+CHANNEL_LINK = os.getenv("CHANNEL_LINK")
+
+# Для SQLite не нужен DATABASE_URL
+# DATABASE_URL = os.getenv("DATABASE_URL")
 
 MIN_BET = 100
 MAX_BET = 1000000
@@ -24,5 +23,3 @@ BONUS_MAX = 10000
 
 BOT_VERSION = "1.0"
 BOT_RELEASE_DATE = "2024-04-15"
-
-print(f"✅ Токен загружен: {BOT_TOKEN[:10]}...")
