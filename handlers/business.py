@@ -2,7 +2,7 @@ from aiogram import Router, F
 from aiogram.types import CallbackQuery
 import datetime
 
-from database import db
+from database_sqlite import db
 from keyboards.inline import get_business_menu, get_back_button
 
 router = Router()
