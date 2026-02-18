@@ -4,7 +4,7 @@ from aiogram.filters import Command
 from aiogram.enums import ChatMemberStatus
 
 from config import CHANNEL_ID, CHANNEL_LINK, ADMIN_USERNAME, BOT_VERSION, BOT_RELEASE_DATE
-from database import db
+from database_sqlite import db
 from keyboards.inline import get_start_keyboard, get_main_menu
 
 router = Router()
