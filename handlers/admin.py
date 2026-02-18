@@ -3,7 +3,7 @@ from aiogram.types import Message
 from aiogram.filters import Command
 
 from config import ADMIN_IDS
-from database import db
+from database_sqlite import db
 from handlers.donate import process_paid_donate
 
 router = Router()
