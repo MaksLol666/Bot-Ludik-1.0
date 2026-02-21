@@ -39,7 +39,7 @@ async def start_mines(message: Message, state: FSMContext):
         return
     
     user_id = message.from_user.id
-    user = await db.get_user(user_id)
+    user = db.get_user(user_id)
     
     if not user:
         await message.answer("❌ Ты не зарегистрирован! Напиши /start")
@@ -61,7 +61,7 @@ async def start_mines(message: Message, state: FSMContext):
         await message.answer(f"❌ Максимальная ставка: {MAX_BET} LC")
         return
     
-    await db.update_balance(user_id, -bet)
+    db.update_balance(user_id, -bet)
     
     mines = random.sample(range(CELLS_COUNT), 5)
     
@@ -202,9 +202,8 @@ async def open_cell(callback: CallbackQuery, state: FSMContext):
             f"💰 Потеряно: {bet} LC"
         )
         
-        await db.add_game_stat(user_id, "mines", False, bet, 0)
-        await update_user_status(user_id)
-        await update_quest_progress(user_id, "mines", 1)
+        db.add_game_stat(user_id, "mines", False, bet, 0)
+        update_user_status(user_id)
         
         await state.clear()
         await callback.answer()
@@ -235,10 +234,9 @@ async def cashout(callback: CallbackQuery, state: FSMContext):
     current_mult = MULTIPLIERS.get(len(opened), 300)
     win_amount = int(bet * current_mult)
     
-    await db.update_balance(user_id, win_amount)
-    await db.add_game_stat(user_id, "mines", True, bet, win_amount)
-    await update_user_status(user_id)
-    await update_quest_progress(user_id, "mines", 1)
+    db.update_balance(user_id, win_amount)
+    db.add_game_stat(user_id, "mines", True, bet, win_amount)
+    update_user_status(user_id)
     
     await callback.message.edit_text(
         f"💰 <b>Ты забрал выигрыш!</b>\n\n"
@@ -264,9 +262,8 @@ async def exit_game(callback: CallbackQuery, state: FSMContext):
             f"💰 Ставка {bet} LC сгорает"
         )
         
-        await db.add_game_stat(user_id, "mines", False, bet, 0)
-        await update_user_status(user_id)
-        await update_quest_progress(user_id, "mines", 1)
+        db.add_game_stat(user_id, "mines", False, bet, 0)
+        update_user_status(user_id)
     else:
         await callback.message.edit_text("👋 Игра завершена")
     
