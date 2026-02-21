@@ -22,7 +22,7 @@ async def on_startup(bot: Bot):
     logger.info("Запуск бота...")
     
     # Создаем стартовые промокоды
-    await create_start_promos()
+    create_start_promos()
     
     # Планировщик для лотереи
     scheduler = AsyncIOScheduler()
