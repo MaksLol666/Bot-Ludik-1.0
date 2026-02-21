@@ -1,6 +1,6 @@
 from aiogram import Router, F
 from aiogram.types import CallbackQuery
-from aiogram.utils.deep_link import create_start_link
+from aiogram.utils.link import create_telegram_link  # Новый импорт для aiogram 3.x
 
 from database_sqlite import db
 from keyboards.inline import get_back_button
@@ -12,7 +12,9 @@ async def referral_menu(callback: CallbackQuery):
     user_id = callback.from_user.id
     
     bot = callback.bot
-    deep_link = await create_start_link(bot, f"ref_{user_id}", encode=True)
+    # Создаем реферальную ссылку для aiogram 3.x
+    bot_username = (await bot.me()).username
+    deep_link = f"https://t.me/{bot_username}?start=ref_{user_id}"
     
     conn = db.get_connection()
     
