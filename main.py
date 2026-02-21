@@ -7,10 +7,11 @@ from aiogram.enums import ParseMode
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from config import BOT_TOKEN
-from database_sqlite import db  # Импортируем SQLite версию
+from database_sqlite import db
 from handlers import (
     start, games, dice_duel, mines, lottery, profile, top, status,
-    promo, business, donate, bonus, referral, admin, transfers  # Добавили transfers
+    promo, business, donate, bonus, referral, admin, transfers,
+    blackjack  # ДОБАВИТЬ
 )
 from utils.promo_setup import create_start_promos
 
@@ -20,9 +21,10 @@ logger = logging.getLogger(__name__)
 async def on_startup(bot: Bot):
     logger.info("Запуск бота...")
     
-    # Добавить await!
-    await create_start_promos()  # БЫЛО: create_start_promos()
+    # Создаем стартовые промокоды
+    await create_start_promos()
     
+    # Планировщик для лотереи
     scheduler = AsyncIOScheduler()
     scheduler.add_job(
         lottery.draw_lottery, 
@@ -38,7 +40,6 @@ async def on_startup(bot: Bot):
 
 async def on_shutdown():
     logger.info("Остановка бота...")
-    # Для SQLite не нужно закрывать соединение
     logger.info("Бот остановлен")
 
 async def main():
@@ -63,7 +64,8 @@ async def main():
     dp.include_router(bonus.router)
     dp.include_router(referral.router)
     dp.include_router(admin.router)
-    dp.include_router(transfers.router)  # Новый роутер для переводов
+    dp.include_router(transfers.router)
+    dp.include_router(blackjack.router)  # ДОБАВИТЬ
     
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
