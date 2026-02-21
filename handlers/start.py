@@ -15,7 +15,6 @@ async def cmd_start(message: Message):
     username = message.from_user.username or "NoUsername"
     first_name = message.from_user.first_name
     
-    # Обработка реферальной ссылки
     args = message.text.split()
     referrer_id = None
     if len(args) > 1 and args[1].startswith("ref_"):
@@ -65,17 +64,14 @@ async def cmd_start(message: Message):
         await message.answer(
             f"🎲 <b>С возвращением, {first_name}!</b>\n\n"
             f"💰 Твой баланс: {user['balance_lc']} #LC",
-            f"💎 GLC: {user['balance_glc']}",
             reply_markup=get_main_menu()
         )
-
-# ... остальной код без изменений ...
 
 @router.message(Command("play"))
 async def cmd_play(message: Message):
     user_id = message.from_user.id
     
-    user = await db.get_user(user_id)
+    user = db.get_user(user_id)
     if user and user['is_banned']:
         await message.answer(f"⛔ Вы заблокированы!")
         return
@@ -99,8 +95,7 @@ async def show_info(callback: CallbackQuery):
         f"<b>Информация о боте \"Лудик {BOT_VERSION}\"</b>\n\n"
         f"👑 <b>Владелец:</b> {ADMIN_USERNAME}\n"
         f"📅 <b>Релиз:</b> {BOT_RELEASE_DATE}\n"
-        f"📊 <b>Версия:</b> {BOT_VERSION}\n"
-        f"💬 <b>Чат:</b> {CHAT_LINK}\n\n"
+        f"📊 <b>Версия:</b> {BOT_VERSION}\n\n"
         f"⚠️ <b>ВНИМАНИЕ:</b>\n"
         f"• Денежные средства не возвращаются.\n"
         f"• Вывод средств не предусмотрен.\n"
