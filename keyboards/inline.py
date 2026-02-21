@@ -1,6 +1,8 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+router = Router()  # ДОБАВИТЬ ЭТУ СТРОКУ В НАЧАЛО ФАЙЛА
+
 def get_start_keyboard() -> InlineKeyboardMarkup:
     """Клавиатура для /start"""
     builder = InlineKeyboardBuilder()
@@ -32,11 +34,10 @@ def get_main_menu() -> InlineKeyboardMarkup:
     )
     builder.row(
         InlineKeyboardButton(text="👥 Рефералы", callback_data="referral_menu"),
-        InlineKeyboardButton(text="💰 GLC", callback_data="glc_info")
+        InlineKeyboardButton(text="ℹ️ Инфо", callback_data="info")
     )
     builder.row(
-        InlineKeyboardButton(text="📋 Квесты", callback_data="daily_quests"),
-        InlineKeyboardButton(text="ℹ️ Инфо", callback_data="info")
+        InlineKeyboardButton(text="💰 GLC", callback_data="glc_info")
     )
     return builder.as_markup()
 
@@ -51,37 +52,10 @@ def get_casino_menu() -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="🎲 Кости", callback_data="game_dice"),
         InlineKeyboardButton(text="💣 Мины", callback_data="game_mines")
     )
-    builder.row(InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_main"))
-    return builder.as_markup()
-
-def get_roulette_keyboard() -> InlineKeyboardMarkup:
-    """Клавиатура для рулетки"""
-    builder = InlineKeyboardBuilder()
     builder.row(
-        InlineKeyboardButton(text="🔴 КРАСНОЕ", callback_data="roulette_red"),
-        InlineKeyboardButton(text="⚫ ЧЕРНОЕ", callback_data="roulette_black")
+        InlineKeyboardButton(text="🃏 Блэкджек", callback_data="game_blackjack"),  # НОВАЯ КНОПКА
+        InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_main")
     )
-    
-    numbers_row1 = []
-    for i in range(1, 13):
-        numbers_row1.append(InlineKeyboardButton(text=str(i), callback_data=f"roulette_num_{i}"))
-    builder.row(*numbers_row1)
-    
-    numbers_row2 = []
-    for i in range(13, 25):
-        numbers_row2.append(InlineKeyboardButton(text=str(i), callback_data=f"roulette_num_{i}"))
-    builder.row(*numbers_row2)
-    
-    numbers_row3 = []
-    for i in range(25, 37):
-        numbers_row3.append(InlineKeyboardButton(text=str(i), callback_data=f"roulette_num_{i}"))
-    builder.row(*numbers_row3)
-    
-    builder.row(
-        InlineKeyboardButton(text="0️⃣ НОЛЬ", callback_data="roulette_num_0"),
-        InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_casino")
-    )
-    
     return builder.as_markup()
 
 def get_business_menu() -> InlineKeyboardMarkup:
@@ -102,30 +76,28 @@ def get_business_menu() -> InlineKeyboardMarkup:
     builder.row(InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_main"))
     return builder.as_markup()
 
-def get_daily_quests_keyboard(quests: list) -> InlineKeyboardMarkup:
-    """Клавиатура для ежедневных квестов"""
-    builder = InlineKeyboardBuilder()
-    
-    for quest in quests:
-        if quest['completed'] and not quest['claimed']:
-            builder.row(InlineKeyboardButton(
-                text=f"🎁 Забрать {quest['reward_lc']} LC + {quest['reward_glc']} GLC",
-                callback_data=f"claim_quest_{quest['id']}"
-            ))
-    
-    builder.row(InlineKeyboardButton(text="🔄 Обновить", callback_data="daily_quests"))
-    builder.row(InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_main"))
-    
-    return builder.as_markup()
-
 def get_back_button() -> InlineKeyboardMarkup:
     """Кнопка назад"""
     builder = InlineKeyboardBuilder()
     builder.add(InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_main"))
     return builder.as_markup()
 
-def get_back_to_casino() -> InlineKeyboardMarkup:
-    """Кнопка назад в казино"""
-    builder = InlineKeyboardBuilder()
-    builder.add(InlineKeyboardButton(text="◀️ Назад в казино", callback_data="back_to_casino"))
-    return builder.as_markup()
+# ДОБАВИТЬ ЭТОТ ОБРАБОТЧИК В КОНЕЦ ФАЙЛА
+@router.callback_query(F.data == "game_blackjack")
+async def blackjack_help(callback: CallbackQuery):
+    text = (
+        "🃏 <b>Блэкджек (21)</b>\n\n"
+        "<b>Как играть:</b>\n"
+        "Напиши в чат команду:\n"
+        "<code>бджек [ставка]</code>\n\n"
+        "<b>Пример:</b>\n"
+        "бджек 1000\n\n"
+        "<b>Правила:</b>\n"
+        "• Нужно набрать 21 или ближе к 21\n"
+        "• Карты от 2 до 10 - по номиналу\n"
+        "• Валет, Дама, Король - 10 очков\n"
+        "• Туз - 11 или 1 очко\n"
+        "• Блэкджек (21 с двух карт) дает выигрыш x2.5"
+    )
+    await callback.message.edit_text(text, reply_markup=get_back_button())
+    await callback.answer()
