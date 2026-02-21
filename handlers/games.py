@@ -3,13 +3,11 @@ from aiogram.types import Message, CallbackQuery
 import random
 
 from database_sqlite import db
-from handlers.status import update_user_status  # Только этот импорт
+from handlers.status import update_user_status
 from keyboards.inline import get_casino_menu, get_back_button
 from config import MIN_BET, MAX_BET
 
 router = Router()
-
-# ... остальной код games.py ...
 
 @router.callback_query(F.data == "casino_menu")
 async def show_casino(callback: CallbackQuery):
@@ -56,10 +54,6 @@ async def slots_help(callback: CallbackQuery):
     await callback.message.edit_text(text, reply_markup=get_back_button())
     await callback.answer()
 
-@router.callback_query(F.data == "back_to_casino")
-async def back_to_casino(callback: CallbackQuery):
-    await show_casino(callback)
-
 @router.message(F.text.lower().startswith("рул"))
 async def process_roulette(message: Message):
     parts = message.text.split()
@@ -75,7 +69,7 @@ async def process_roulette(message: Message):
         return
     
     user_id = message.from_user.id
-    user = await db.get_user(user_id)
+    user = db.get_user(user_id)
     
     if not user:
         await message.answer("❌ Ты не зарегистрирован! Напиши /start")
@@ -93,7 +87,7 @@ async def process_roulette(message: Message):
         await message.answer("❌ Недостаточно средств!")
         return
     
-    await db.update_balance(user_id, -bet)
+    db.update_balance(user_id, -bet)
     
     result = random.randint(0, 36)
     
@@ -123,9 +117,8 @@ async def process_roulette(message: Message):
             win_amount = bet * 2
     
     if win:
-        await db.add_game_stat(user_id, "roulette", True, bet, win_amount)
-        await update_user_status(user_id)
-        await update_quest_progress(user_id, "roulette", 1)
+        db.add_game_stat(user_id, "roulette", True, bet, win_amount)
+        update_user_status(user_id)
         await message.answer(
             f"🎉 <b>Ты выиграл!</b>\n\n"
             f"Выпало: {result} ({color})\n"
@@ -134,9 +127,8 @@ async def process_roulette(message: Message):
             f"💰 Баланс: {user['balance_lc'] - bet + win_amount} LC"
         )
     else:
-        await db.add_game_stat(user_id, "roulette", False, bet, 0)
-        await update_user_status(user_id)
-        await update_quest_progress(user_id, "roulette", 1)
+        db.add_game_stat(user_id, "roulette", False, bet, 0)
+        update_user_status(user_id)
         await message.answer(
             f"💔 <b>Ты проиграл!</b>\n\n"
             f"Выпало: {result} ({color})\n"
@@ -158,7 +150,7 @@ async def process_slots(message: Message):
         return
     
     user_id = message.from_user.id
-    user = await db.get_user(user_id)
+    user = db.get_user(user_id)
     
     if not user:
         await message.answer("❌ Ты не зарегистрирован! Напиши /start")
@@ -176,7 +168,7 @@ async def process_slots(message: Message):
         await message.answer("❌ Недостаточно средств!")
         return
     
-    await db.update_balance(user_id, -bet)
+    db.update_balance(user_id, -bet)
     
     symbols = ["🍒", "🍋", "💎", "7️⃣"]
     weights = [0.5, 0.3, 0.15, 0.05]
@@ -196,9 +188,8 @@ async def process_slots(message: Message):
     
     if win_mult > 0:
         win_amount = bet * win_mult
-        await db.add_game_stat(user_id, "slots", True, bet, win_amount)
-        await update_user_status(user_id)
-        await update_quest_progress(user_id, "slots", 1)
+        db.add_game_stat(user_id, "slots", True, bet, win_amount)
+        update_user_status(user_id)
         result_text = (
             f"🎰 <b>Слоты</b>\n\n"
             f"{' '.join(spin)}\n\n"
@@ -208,9 +199,8 @@ async def process_slots(message: Message):
             f"💰 Баланс: {user['balance_lc'] - bet + win_amount} LC"
         )
     else:
-        await db.add_game_stat(user_id, "slots", False, bet, 0)
-        await update_user_status(user_id)
-        await update_quest_progress(user_id, "slots", 1)
+        db.add_game_stat(user_id, "slots", False, bet, 0)
+        update_user_status(user_id)
         result_text = (
             f"🎰 <b>Слоты</b>\n\n"
             f"{' '.join(spin)}\n\n"
