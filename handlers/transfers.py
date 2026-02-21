@@ -89,7 +89,6 @@ async def process_amount(message: Message, state: FSMContext):
             f"Спасибо за честность! 🤝"
         )
         
-        # Уведомляем получателя
         try:
             await message.bot.send_message(
                 receiver_id,
