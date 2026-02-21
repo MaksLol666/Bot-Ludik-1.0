@@ -1,9 +1,8 @@
-from aiogram import Router, F  # ДОБАВИТЬ ЭТУ СТРОКУ!
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram import Router, F
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from aiogram.filters import Command  # Если нужно
 
-router = Router()  # Теперь Router определен
+router = Router()
 
 def get_start_keyboard() -> InlineKeyboardMarkup:
     """Клавиатура для /start"""
