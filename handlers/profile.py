@@ -12,7 +12,7 @@ router = Router()
 @router.callback_query(F.data == "my_stats")
 async def show_my_stats(event: Message | CallbackQuery):
     user_id = event.from_user.id
-    user = await db.get_user(user_id)
+    user = db.get_user(user_id)
     
     if not user:
         text = "❌ Ты не зарегистрирован! Напиши /start"
@@ -23,48 +23,43 @@ async def show_my_stats(event: Message | CallbackQuery):
             await event.answer()
         return
     
-    pool = await db.get_pool()
-    async with pool.acquire() as conn:
-        stats = await conn.fetch("""
-            SELECT game_type, 
-                   COUNT(*) as total,
-                   SUM(CASE WHEN win THEN 1 ELSE 0 END) as wins,
-                   SUM(CASE WHEN win THEN 0 ELSE 1 END) as losses,
-                   COALESCE(SUM(bet), 0) as total_bet,
-                   COALESCE(SUM(CASE WHEN win THEN win_amount ELSE 0 END), 0) as total_won
-            FROM game_stats 
-            WHERE user_id = $1
-            GROUP BY game_type
-        """, user_id)
+    conn = db.get_connection()
+    cursor = conn.execute("""
+        SELECT game_type, 
+               COUNT(*) as total_games,
+               SUM(CASE WHEN win THEN 1 ELSE 0 END) as wins,
+               SUM(CASE WHEN win THEN 0 ELSE 1 END) as losses
+        FROM game_stats 
+        WHERE user_id = ?
+        GROUP BY game_type
+    """, (user_id,))
+    rows = cursor.fetchall()
     
-    stats_dict = {s['game_type']: s for s in stats}
+    stats_dict = {}
+    for row in rows:
+        stats_dict[row[0]] = {
+            'wins': row[2],
+            'losses': row[3],
+            'total_bets': row[1]
+        }
     
     def get_stat(game):
         s = stats_dict.get(game, {})
-        return f"{s.get('wins', 0)}💰 / {s.get('losses', 0)}💔 / {s.get('total', 0)} игр"
+        return f"{s.get('wins', 0)}💰 / {s.get('losses', 0)}💔 / {s.get('total_bets', 0)} ставок"
     
-    display_name = await get_display_name(user_id, event.from_user.username or "NoUsername")
-    
-    # Считаем общую статистику
-    total_games = sum(s.get('total', 0) for s in stats_dict.values())
-    total_won = sum(s.get('total_won', 0) for s in stats_dict.values())
+    display_name = get_display_name(user_id, event.from_user.username or "NoUsername")
     
     text = (
         f"👤 <b>Пользователь:</b> {display_name} | ID: {user_id}\n"
         f"📈 <b>Общая статистика:</b>\n\n"
         f"🃏 Рулетка: {get_stat('roulette')}\n"
         f"🎰 Слоты: {get_stat('slots')}\n"
-        f"🎲 Кости (дуэль): {get_stat('dice_duel')}\n"
+        f"🎲 Кости: {get_stat('dice')}\n"
         f"💣 Мины: {get_stat('mines')}\n"
-        f"♠️ Покер: {get_stat('poker')}\n"
-        f"🃏 Блэкджек: {get_stat('blackjack')}\n"
-        f"📈 Краш: {get_stat('crash')}\n"
-        f"🎲 Dice: {get_stat('dice_game')}\n"
-        f"🎟 Лотерея: {get_stat('lottery')}\n\n"
+        f"🎟 Лотерея: {get_stat('lottery')}\n"
+        f"🃏 Блэкджек: {get_stat('blackjack')}\n\n"
         f"🪙 Баланс LC: {user['balance_lc']}\n"
         f"💰 Баланс GLC: {user['balance_glc']}\n\n"
-        f"📊 Всего игр: {total_games}\n"
-        f"🏆 Всего выиграно: {total_won} LC\n"
         f"😭 Всего проиграно: {user['total_lost']} LC"
     )
     
