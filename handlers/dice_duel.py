@@ -29,7 +29,7 @@ async def create_duel(message: Message, state: FSMContext):
         return
     
     user_id = message.from_user.id
-    user = await db.get_user(user_id)
+    user = db.get_user(user_id)
     
     if not user:
         await message.answer("❌ Ты не зарегистрирован! Напиши /start")
@@ -99,7 +99,7 @@ async def accept_duel(callback: CallbackQuery, state: FSMContext):
         await callback.answer("❌ Нельзя играть с самим собой!", show_alert=True)
         return
     
-    opponent = await db.get_user(opponent_id)
+    opponent = db.get_user(opponent_id)
     
     if not opponent:
         await callback.answer("❌ Ты не зарегистрирован!", show_alert=True)
@@ -113,8 +113,8 @@ async def accept_duel(callback: CallbackQuery, state: FSMContext):
         await callback.answer(f"❌ У тебя недостаточно средств! Нужно {duel['bet']} LC", show_alert=True)
         return
     
-    await db.update_balance(duel['creator'], -duel['bet'])
-    await db.update_balance(opponent_id, -duel['bet'])
+    db.update_balance(duel['creator'], -duel['bet'])
+    db.update_balance(opponent_id, -duel['bet'])
     
     duel['opponent'] = opponent_id
     duel['opponent_name'] = callback.from_user.full_name
@@ -127,23 +127,23 @@ async def accept_duel(callback: CallbackQuery, state: FSMContext):
         winner_id = duel['creator']
         winner_name = duel['creator_name']
         win_amount = duel['bet'] * 2
-        await db.update_balance(winner_id, win_amount)
-        await db.add_game_stat(winner_id, "dice", True, duel['bet'], win_amount)
-        await db.add_game_stat(opponent_id, "dice", False, duel['bet'], 0)
-        await update_user_status(winner_id)
-        await update_user_status(opponent_id)
+        db.update_balance(winner_id, win_amount)
+        db.add_game_stat(winner_id, "dice", True, duel['bet'], win_amount)
+        db.add_game_stat(opponent_id, "dice", False, duel['bet'], 0)
+        update_user_status(winner_id)
+        update_user_status(opponent_id)
     elif opponent_roll > creator_roll:
         winner_id = opponent_id
         winner_name = duel['opponent_name']
         win_amount = duel['bet'] * 2
-        await db.update_balance(winner_id, win_amount)
-        await db.add_game_stat(winner_id, "dice", True, duel['bet'], win_amount)
-        await db.add_game_stat(duel['creator'], "dice", False, duel['bet'], 0)
-        await update_user_status(winner_id)
-        await update_user_status(duel['creator'])
+        db.update_balance(winner_id, win_amount)
+        db.add_game_stat(winner_id, "dice", True, duel['bet'], win_amount)
+        db.add_game_stat(duel['creator'], "dice", False, duel['bet'], 0)
+        update_user_status(winner_id)
+        update_user_status(duel['creator'])
     else:
-        await db.update_balance(duel['creator'], duel['bet'])
-        await db.update_balance(opponent_id, duel['bet'])
+        db.update_balance(duel['creator'], duel['bet'])
+        db.update_balance(opponent_id, duel['bet'])
         
         await callback.message.edit_text(
             f"🎲 <b>НИЧЬЯ!</b>\n\n"
