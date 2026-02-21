@@ -20,27 +20,32 @@ DRAW_DAY = 6  # Воскресенье
 async def lottery_menu(callback: CallbackQuery):
     user_id = callback.from_user.id
     
-    pool = await db.get_pool()
-    async with pool.acquire() as conn:
-        current_week = await get_current_week_number()
-        
-        tickets_total = await conn.fetchval("""
-            SELECT COALESCE(SUM(ticket_count), 0) 
-            FROM lottery_tickets 
-            WHERE week_number = $1
-        """, current_week) or 0
-        
-        user_tickets = await conn.fetchval("""
-            SELECT COALESCE(ticket_count, 0)
-            FROM lottery_tickets 
-            WHERE user_id = $1 AND week_number = $2
-        """, user_id, current_week) or 0
-        
-        previous = await conn.fetch("""
-            SELECT * FROM lottery_results 
-            ORDER BY draw_date DESC 
-            LIMIT 3
-        """)
+    conn = db.get_connection()
+    
+    current_week = get_current_week_number()
+    
+    cursor = conn.execute("""
+        SELECT COALESCE(SUM(ticket_count), 0) as total
+        FROM lottery_tickets 
+        WHERE week_number = ?
+    """, (current_week,))
+    row = cursor.fetchone()
+    tickets_total = row[0] if row else 0
+    
+    cursor = conn.execute("""
+        SELECT COALESCE(ticket_count, 0) as total
+        FROM lottery_tickets 
+        WHERE user_id = ? AND week_number = ?
+    """, (user_id, current_week))
+    row = cursor.fetchone()
+    user_tickets = row[0] if row else 0
+    
+    cursor = conn.execute("""
+        SELECT * FROM lottery_results 
+        ORDER BY draw_date DESC 
+        LIMIT 3
+    """)
+    previous = cursor.fetchall()
     
     now = datetime.now()
     weekday = now.weekday()
@@ -58,7 +63,7 @@ async def lottery_menu(callback: CallbackQuery):
     if previous:
         prev_text = "\n\n📊 <b>Прошлые розыгрыши:</b>\n"
         for p in previous[:3]:
-            prev_text += f"{p['draw_date'].strftime('%d.%m')}: {p['winners']}\n"
+            prev_text += f"{p[3][:10]}: {p[4]}\n"
     
     text = (
         "🎟 <b>ЛОТЕРЕЯ</b>\n\n"
@@ -101,7 +106,7 @@ async def buy_lottery_tickets(message: Message):
         return
     
     user_id = message.from_user.id
-    user = await db.get_user(user_id)
+    user = db.get_user(user_id)
     
     if not user:
         await message.answer("❌ Ты не зарегистрирован! Напиши /start")
@@ -117,27 +122,28 @@ async def buy_lottery_tickets(message: Message):
         await message.answer(f"❌ Недостаточно средств! Нужно {total_cost} LC")
         return
     
-    current_week = await get_current_week_number()
+    current_week = get_current_week_number()
     
-    pool = await db.get_pool()
-    async with pool.acquire() as conn:
-        async with conn.transaction():
-            await db.update_balance(user_id, -total_cost)
-            
-            await conn.execute("""
-                INSERT INTO lottery_tickets (user_id, week_number, ticket_count)
-                VALUES ($1, $2, $3)
-                ON CONFLICT (user_id, week_number) 
-                DO UPDATE SET ticket_count = lottery_tickets.ticket_count + $3
-            """, user_id, current_week, count)
-            
-            total_tickets = await conn.fetchval("""
-                SELECT COALESCE(SUM(ticket_count), 0)
-                FROM lottery_tickets 
-                WHERE week_number = $1
-            """, current_week)
+    conn = db.get_connection()
     
-    await update_quest_progress(user_id, "lottery", count)
+    db.update_balance(user_id, -total_cost)
+    
+    conn.execute("""
+        INSERT INTO lottery_tickets (user_id, week_number, ticket_count)
+        VALUES (?, ?, ?)
+        ON CONFLICT(user_id, week_number) DO UPDATE SET 
+            ticket_count = ticket_count + ?
+    """, (user_id, current_week, count, count))
+    
+    cursor = conn.execute("""
+        SELECT COALESCE(SUM(ticket_count), 0) as total
+        FROM lottery_tickets 
+        WHERE week_number = ?
+    """, (current_week,))
+    row = cursor.fetchone()
+    total_tickets = row[0] if row else 0
+    
+    conn.commit()
     
     await message.answer(
         f"✅ <b>Билеты куплены!</b>\n\n"
@@ -150,20 +156,24 @@ async def buy_lottery_tickets(message: Message):
 @router.message(Command("моибилеты"))
 async def my_tickets(message: Message):
     user_id = message.from_user.id
-    current_week = await get_current_week_number()
+    current_week = get_current_week_number()
     
-    pool = await db.get_pool()
-    async with pool.acquire() as conn:
-        tickets = await conn.fetchval("""
-            SELECT ticket_count FROM lottery_tickets 
-            WHERE user_id = $1 AND week_number = $2
-        """, user_id, current_week) or 0
-        
-        total_tickets = await conn.fetchval("""
-            SELECT COALESCE(SUM(ticket_count), 0)
-            FROM lottery_tickets 
-            WHERE week_number = $1
-        """, current_week) or 0
+    conn = db.get_connection()
+    
+    cursor = conn.execute("""
+        SELECT ticket_count FROM lottery_tickets 
+        WHERE user_id = ? AND week_number = ?
+    """, (user_id, current_week))
+    row = cursor.fetchone()
+    tickets = row[0] if row else 0
+    
+    cursor = conn.execute("""
+        SELECT COALESCE(SUM(ticket_count), 0) as total
+        FROM lottery_tickets 
+        WHERE week_number = ?
+    """, (current_week,))
+    row = cursor.fetchone()
+    total_tickets = row[0] if row else 0
     
     await message.answer(
         f"🎫 <b>Твои билеты</b>\n\n"
@@ -172,91 +182,91 @@ async def my_tickets(message: Message):
         f"• Всего продано: {total_tickets} билетов\n"
     )
 
-async def get_current_week_number() -> str:
+def get_current_week_number() -> str:
     now = datetime.now()
     week = now.isocalendar()[1]
     return f"{now.year}-{week}"
 
 async def draw_lottery(bot):
-    current_week = await get_current_week_number()
+    current_week = get_current_week_number()
     
-    pool = await db.get_pool()
-    async with pool.acquire() as conn:
-        participants = await conn.fetch("""
-            SELECT user_id, ticket_count 
-            FROM lottery_tickets 
-            WHERE week_number = $1
-        """, current_week)
+    conn = db.get_connection()
+    
+    cursor = conn.execute("""
+        SELECT user_id, ticket_count 
+        FROM lottery_tickets 
+        WHERE week_number = ?
+    """, (current_week,))
+    participants = cursor.fetchall()
+    
+    if not participants:
+        await bot.send_message(
+            "@BotLudik_chanels",
+            "🎟 <b>РОЗЫГРЫШ ЛОТЕРЕИ</b>\n\n"
+            "В этой неделе никто не купил билеты 😢"
+        )
+        return
+    
+    tickets_pool = []
+    for p in participants:
+        tickets_pool.extend([p[0]] * p[1])
+    
+    random.shuffle(tickets_pool)
+    
+    winners = []
+    winners_pool = tickets_pool.copy()
+    
+    while len(winners) < 3 and winners_pool:
+        winner = random.choice(winners_pool)
         
-        if not participants:
-            await bot.send_message(
-                "@BotLudik_chanels",
-                "🎟 <b>РОЗЫГРЫШ ЛОТЕРЕИ</b>\n\n"
-                "В этой неделе никто не купил билеты 😢"
+        if winner not in [w['user_id'] for w in winners]:
+            place = len(winners)
+            winners.append({
+                'user_id': winner,
+                'place': place,
+                'prize': PRIZES[place]
+            })
+        
+        winners_pool = [x for x in winners_pool if x != winner]
+    
+    results_text = "🎟 <b>РЕЗУЛЬТАТЫ ЛОТЕРЕИ</b>\n\n"
+    
+    for winner in winners:
+        user = db.get_user(winner['user_id'])
+        username = user.get('username') or f"id{winner['user_id']}"
+        
+        db.update_balance(winner['user_id'], winner['prize'])
+        
+        db.add_game_stat(
+            winner['user_id'], 
+            "lottery", 
+            True, 
+            LOTTERY_PRICE * next((p[1] for p in participants if p[0] == winner['user_id']), 1),
+            winner['prize']
+        )
+        update_user_status(winner['user_id'])
+        
+        results_text += f"{PRIZE_NAMES[winner['place']]}: @{username} — {winner['prize']} LC\n"
+    
+    for p in participants:
+        if p[0] not in [w['user_id'] for w in winners]:
+            db.add_game_stat(
+                p[0],
+                "lottery",
+                False,
+                p[1] * LOTTERY_PRICE,
+                0
             )
-            return
-        
-        tickets_pool = []
-        for p in participants:
-            tickets_pool.extend([p['user_id']] * p['ticket_count'])
-        
-        random.shuffle(tickets_pool)
-        
-        winners = []
-        winners_pool = tickets_pool.copy()
-        
-        while len(winners) < 3 and winners_pool:
-            winner = random.choice(winners_pool)
-            
-            if winner not in [w['user_id'] for w in winners]:
-                place = len(winners)
-                winners.append({
-                    'user_id': winner,
-                    'place': place,
-                    'prize': PRIZES[place]
-                })
-            
-            winners_pool = [x for x in winners_pool if x != winner]
-        
-        results_text = "🎟 <b>РЕЗУЛЬТАТЫ ЛОТЕРЕИ</b>\n\n"
-        
-        for winner in winners:
-            user = await db.get_user(winner['user_id'])
-            username = user.get('username') or f"id{winner['user_id']}"
-            
-            await db.update_balance(winner['user_id'], winner['prize'])
-            
-            await db.add_game_stat(
-                winner['user_id'], 
-                "lottery", 
-                True, 
-                LOTTERY_PRICE * next((p['ticket_count'] for p in participants if p['user_id'] == winner['user_id']), 1),
-                winner['prize']
-            )
-            await update_user_status(winner['user_id'])
-            await update_quest_progress(winner['user_id'], "lottery", 1)
-            
-            results_text += f"{PRIZE_NAMES[winner['place']]}: @{username} — {winner['prize']} LC\n"
-        
-        for p in participants:
-            if p['user_id'] not in [w['user_id'] for w in winners]:
-                await db.add_game_stat(
-                    p['user_id'],
-                    "lottery",
-                    False,
-                    p['ticket_count'] * LOTTERY_PRICE,
-                    0
-                )
-                await update_user_status(p['user_id'])
-                await update_quest_progress(p['user_id'], "lottery", 1)
-        
-        winners_str = ", ".join([f"@{w['user_id']}" for w in winners])
-        await conn.execute("""
-            INSERT INTO lottery_results (week_number, draw_date, winners, total_tickets, total_amount)
-            VALUES ($1, NOW(), $2, $3, $4)
-        """, current_week, winners_str, len(tickets_pool), sum(PRIZES))
-        
-        await conn.execute("DELETE FROM lottery_tickets WHERE week_number = $1", current_week)
+            update_user_status(p[0])
+    
+    winners_str = ", ".join([f"@{w['user_id']}" for w in winners])
+    conn.execute("""
+        INSERT INTO lottery_results (week_number, draw_date, winners, total_tickets, total_amount)
+        VALUES (?, datetime('now'), ?, ?, ?)
+    """, (current_week, winners_str, len(tickets_pool), sum(PRIZES)))
+    
+    conn.execute("DELETE FROM lottery_tickets WHERE week_number = ?", (current_week,))
+    conn.commit()
     
     await bot.send_message("@BotLudik_chanels", results_text)
     return results_text
