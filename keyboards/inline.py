@@ -1,7 +1,9 @@
+from aiogram import Router, F  # ДОБАВИТЬ ЭТУ СТРОКУ!
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.filters import Command  # Если нужно
 
-router = Router()  # ДОБАВИТЬ ЭТУ СТРОКУ В НАЧАЛО ФАЙЛА
+router = Router()  # Теперь Router определен
 
 def get_start_keyboard() -> InlineKeyboardMarkup:
     """Клавиатура для /start"""
@@ -53,7 +55,7 @@ def get_casino_menu() -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="💣 Мины", callback_data="game_mines")
     )
     builder.row(
-        InlineKeyboardButton(text="🃏 Блэкджек", callback_data="game_blackjack"),  # НОВАЯ КНОПКА
+        InlineKeyboardButton(text="🃏 Блэкджек", callback_data="game_blackjack"),
         InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_main")
     )
     return builder.as_markup()
@@ -82,7 +84,7 @@ def get_back_button() -> InlineKeyboardMarkup:
     builder.add(InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_main"))
     return builder.as_markup()
 
-# ДОБАВИТЬ ЭТОТ ОБРАБОТЧИК В КОНЕЦ ФАЙЛА
+# Обработчик для блэкджека
 @router.callback_query(F.data == "game_blackjack")
 async def blackjack_help(callback: CallbackQuery):
     text = (
