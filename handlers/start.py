@@ -26,9 +26,9 @@ async def cmd_start(message: Message):
         except:
             referrer_id = None
     
-    user = await db.get_user(user_id)
+    user = db.get_user(user_id)
     if not user:
-        await db.create_user(user_id, username, first_name, referrer_id)
+        db.create_user(user_id, username, first_name, referrer_id)
         
         welcome_text = (
             f"🎰 <b>Добро пожаловать в Лудик {BOT_VERSION}!</b>\n\n"
