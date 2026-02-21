@@ -1,73 +1,65 @@
+import random
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
-import random
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
 
 from database_sqlite import db
 from handlers.status import update_user_status
-from handlers.glc import check_win_streak
-from handlers.daily_quests import update_quest_progress
 from config import MIN_BET, MAX_BET
-from keyboards.inline import get_back_button
 
 router = Router()
 
+# Значения карт
+CARD_VALUES = {
+    '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10,
+    'J': 10, 'Q': 10, 'K': 10, 'A': 11
+}
+
+CARDS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
 SUITS = ['♥️', '♦️', '♣️', '♠️']
-RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
 
-class BlackjackGame:
-    def __init__(self, bet):
-        self.bet = bet
-        self.deck = []
-        self.player_hand = []
-        self.dealer_hand = []
-        self.game_over = False
-        
-    def create_deck(self):
-        self.deck = [(rank, suit) for suit in SUITS for rank in RANKS] * 4
-        random.shuffle(self.deck)
-    
-    def deal_card(self):
-        return self.deck.pop()
-    
-    def hand_value(self, hand):
-        value = 0
-        aces = 0
-        for rank, _ in hand:
-            if rank in ['J', 'Q', 'K']:
-                value += 10
-            elif rank == 'A':
-                aces += 1
-                value += 11
-            else:
-                value += int(rank)
-        
-        while value > 21 and aces:
-            value -= 10
-            aces -= 1
-        
-        return value
-    
-    def start_game(self):
-        self.create_deck()
-        self.player_hand = [self.deal_card(), self.deal_card()]
-        self.dealer_hand = [self.deal_card(), self.deal_card()]
-    
-    def player_hit(self):
-        self.player_hand.append(self.deal_card())
-        return self.hand_value(self.player_hand) > 21
-    
-    def dealer_play(self):
-        while self.hand_value(self.dealer_hand) < 17:
-            self.dealer_hand.append(self.deal_card())
-        return self.hand_value(self.dealer_hand)
+class BlackjackStates(StatesGroup):
+    playing = State()
 
-active_blackjack = {}
+def create_deck():
+    """Создание колоды"""
+    deck = []
+    for suit in SUITS:
+        for card in CARDS:
+            deck.append(f"{card}{suit}")
+    random.shuffle(deck)
+    return deck
 
-@router.message(F.text.lower().startswith(("бдж", "bj", "blackjack")))
-async def start_blackjack(message: Message):
+def calculate_hand(hand):
+    """Подсчет очков в руке"""
+    total = 0
+    aces = 0
+    for card in hand:
+        value = card[:-1]  # убираем масть
+        if value == 'A':
+            aces += 1
+            total += 11
+        else:
+            total += CARD_VALUES[value]
+    
+    # Если перебор и есть тузы, меняем 11 на 1
+    while total > 21 and aces > 0:
+        total -= 10
+        aces -= 1
+    
+    return total
+
+def hand_to_string(hand):
+    """Преобразование руки в строку"""
+    return ' '.join(hand)
+
+@router.message(F.text.lower().startswith("бджек"))
+@router.message(F.text.lower().startswith("blackjack"))
+async def start_blackjack(message: Message, state: FSMContext):
     parts = message.text.split()
     if len(parts) < 2:
-        await message.answer("❌ Формат: бдж [ставка]")
+        await message.answer("❌ Формат: бджек [ставка]")
         return
     
     try:
@@ -95,119 +87,153 @@ async def start_blackjack(message: Message):
         await message.answer("❌ Недостаточно средств!")
         return
     
+    if bet > MAX_BET:
+        await message.answer(f"❌ Максимальная ставка: {MAX_BET} LC")
+        return
+    
+    # Списываем ставку
     await db.update_balance(user_id, -bet)
     
-    game = BlackjackGame(bet)
-    game.start_game()
-    active_blackjack[user_id] = game
+    # Создаем игру
+    deck = create_deck()
+    player_hand = [deck.pop(), deck.pop()]
+    dealer_hand = [deck.pop(), deck.pop()]
     
-    await show_blackjack_table(message, user_id)
-
-async def show_blackjack_table(message, user_id):
-    game = active_blackjack[user_id]
+    player_score = calculate_hand(player_hand)
+    dealer_score = calculate_hand([dealer_hand[0]])  # только первая карта дилера
     
-    player_value = game.hand_value(game.player_hand)
-    dealer_value = game.hand_value([game.dealer_hand[0]])
-    
-    player_cards = ' '.join([f"{rank}{suit}" for rank, suit in game.player_hand])
-    dealer_cards = f"{game.dealer_hand[0][0]}{game.dealer_hand[0][1]} ❓"
-    
-    text = (
-        f"🃏 <b>БЛЭКДЖЕК</b>\n\n"
-        f"💰 Ставка: {game.bet} LC\n\n"
-        f"👤 <b>Твои карты:</b> {player_cards}\n"
-        f"📊 Сумма: {player_value}\n\n"
-        f"🤵 <b>Дилер:</b> {dealer_cards}\n"
-        f"📊 Сумма: {dealer_value}\n"
-    )
-    
-    from keyboards.inline import get_blackjack_keyboard
-    await message.answer(text, reply_markup=get_blackjack_keyboard())
-
-@router.callback_query(F.data == "bj_hit")
-async def blackjack_hit(callback: CallbackQuery):
-    user_id = callback.from_user.id
-    
-    if user_id not in active_blackjack:
-        await callback.answer("❌ Нет активной игры!", show_alert=True)
-        return
-    
-    game = active_blackjack[user_id]
-    
-    bust = game.player_hit()
-    
-    if bust:
-        await db.add_game_stat(user_id, "blackjack", False, game.bet, 0)
+    # Проверка на блэкджек
+    if player_score == 21:
+        # Блэкджек у игрока
+        win_amount = int(bet * 2.5)
+        await db.update_balance(user_id, win_amount)
+        await db.add_game_stat(user_id, "blackjack", True, bet, win_amount)
         await update_user_status(user_id)
         
-        await update_quest_progress(user_id, "blackjack_bets", 1)
-        await update_quest_progress(user_id, "total_bets", 1)
+        await message.answer(
+            f"🃏 <b>БЛЭКДЖЕК!</b>\n\n"
+            f"Твои карты: {hand_to_string(player_hand)} (21)\n"
+            f"Карты дилера: {hand_to_string(dealer_hand)} ({calculate_hand(dealer_hand)})\n\n"
+            f"💰 Выигрыш: +{win_amount} LC"
+        )
+        return
+    
+    # Сохраняем состояние
+    await state.set_state(BlackjackStates.playing)
+    await state.update_data(
+        bet=bet,
+        deck=deck,
+        player_hand=player_hand,
+        dealer_hand=dealer_hand
+    )
+    
+    # Показываем клавиатуру
+    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🎯 Еще", callback_data="bj_hit"),
+         InlineKeyboardButton(text="⏹ Хватит", callback_data="bj_stand")]
+    ])
+    
+    await message.answer(
+        f"🃏 <b>Блэкджек</b>\n\n"
+        f"Твои карты: {hand_to_string(player_hand)} ({player_score})\n"
+        f"Карты дилера: {hand_to_string([dealer_hand[0]])} + ?\n\n"
+        f"💰 Ставка: {bet} LC",
+        reply_markup=keyboard
+    )
+
+@router.callback_query(F.data.startswith("bj_"), BlackjackStates.playing)
+async def blackjack_action(callback: CallbackQuery, state: FSMContext):
+    action = callback.data.replace("bj_", "")
+    data = await state.get_data()
+    
+    bet = data['bet']
+    deck = data['deck']
+    player_hand = data['player_hand']
+    dealer_hand = data['dealer_hand']
+    user_id = callback.from_user.id
+    
+    if action == "hit":
+        # Игрок берет карту
+        player_hand.append(deck.pop())
+        player_score = calculate_hand(player_hand)
+        
+        if player_score > 21:
+            # Перебор - игрок проиграл
+            await db.add_game_stat(user_id, "blackjack", False, bet, 0)
+            await update_user_status(user_id)
+            
+            await callback.message.edit_text(
+                f"💔 <b>ПЕРЕБОР!</b>\n\n"
+                f"Твои карты: {hand_to_string(player_hand)} ({player_score})\n"
+                f"Карты дилера: {hand_to_string(dealer_hand)} ({calculate_hand(dealer_hand)})\n\n"
+                f"💰 Потеряно: {bet} LC"
+            )
+            await state.clear()
+            await callback.answer()
+            return
+        
+        # Обновляем состояние
+        await state.update_data(player_hand=player_hand, deck=deck)
+        
+        # Показываем обновленную руку
+        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+        
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🎯 Еще", callback_data="bj_hit"),
+             InlineKeyboardButton(text="⏹ Хватит", callback_data="bj_stand")]
+        ])
         
         await callback.message.edit_text(
-            f"💔 <b>ПЕРЕБОР!</b>\n\n"
-            f"Твои карты: {' '.join([f'{r}{s}' for r,s in game.player_hand])}\n"
-            f"Сумма: {game.hand_value(game.player_hand)}\n\n"
-            f"Ты проиграл {game.bet} LC"
+            f"🃏 <b>Блэкджек</b>\n\n"
+            f"Твои карты: {hand_to_string(player_hand)} ({player_score})\n"
+            f"Карты дилера: {hand_to_string([dealer_hand[0]])} + ?\n\n"
+            f"💰 Ставка: {bet} LC",
+            reply_markup=keyboard
         )
-        del active_blackjack[user_id]
-    else:
-        await show_blackjack_table(callback.message, user_id)
-    
-    await callback.answer()
-
-@router.callback_query(F.data == "bj_stand")
-async def blackjack_stand(callback: CallbackQuery):
-    user_id = callback.from_user.id
-    
-    if user_id not in active_blackjack:
-        await callback.answer("❌ Нет активной игры!", show_alert=True)
-        return
-    
-    game = active_blackjack[user_id]
-    
-    dealer_value = game.dealer_play()
-    player_value = game.hand_value(game.player_hand)
-    
-    dealer_cards = ' '.join([f"{r}{s}" for r,s in game.dealer_hand])
-    
-    result_text = f"🤵 <b>Карты дилера:</b> {dealer_cards}\n📊 Сумма: {dealer_value}\n\n"
-    
-    if dealer_value > 21:
-        win_amount = game.bet * 2
-        await db.update_balance(user_id, win_amount)
-        await db.add_game_stat(user_id, "blackjack", True, game.bet, win_amount)
-        await update_user_status(user_id)
-        await check_win_streak(user_id, "blackjack")
-        await update_quest_progress(user_id, "blackjack_wins", 1)
+        await callback.answer()
         
-        result_text += f"🎉 <b>ДИЛЕР ПЕРЕБРАЛ! Ты выиграл!</b>\n+{win_amount} LC"
-    elif dealer_value > player_value:
-        await db.add_game_stat(user_id, "blackjack", False, game.bet, 0)
+    elif action == "stand":
+        # Игрок останавливается - ходит дилер
+        player_score = calculate_hand(player_hand)
+        dealer_score = calculate_hand(dealer_hand)
+        
+        # Дилер берет карты пока не наберет 17+
+        while dealer_score < 17:
+            dealer_hand.append(deck.pop())
+            dealer_score = calculate_hand(dealer_hand)
+        
+        # Определяем результат
+        if dealer_score > 21:
+            # Дилер перебрал - игрок выиграл
+            win_amount = bet * 2
+            await db.update_balance(user_id, win_amount)
+            await db.add_game_stat(user_id, "blackjack", True, bet, win_amount)
+            result_text = f"🎉 <b>Ты выиграл! Дилер перебрал</b>\n\n+{win_amount} LC"
+        elif dealer_score > player_score:
+            # Дилер выиграл
+            await db.add_game_stat(user_id, "blackjack", False, bet, 0)
+            result_text = f"💔 <b>Дилер выиграл</b>\n\n💰 Потеряно: {bet} LC"
+        elif dealer_score < player_score:
+            # Игрок выиграл
+            win_amount = bet * 2
+            await db.update_balance(user_id, win_amount)
+            await db.add_game_stat(user_id, "blackjack", True, bet, win_amount)
+            result_text = f"🎉 <b>Ты выиграл!</b>\n\n+{win_amount} LC"
+        else:
+            # Ничья - возврат ставки
+            await db.update_balance(user_id, bet)
+            await db.add_game_stat(user_id, "blackjack", False, bet, 0)
+            result_text = f"🤝 <b>Ничья</b>\n\n💰 Ставка возвращена: {bet} LC"
+        
         await update_user_status(user_id)
         
-        result_text += f"💔 <b>Дилер выиграл!</b>\nТы потерял {game.bet} LC"
-    elif dealer_value < player_value:
-        win_amount = game.bet * 2
-        await db.update_balance(user_id, win_amount)
-        await db.add_game_stat(user_id, "blackjack", True, game.bet, win_amount)
-        await update_user_status(user_id)
-        await check_win_streak(user_id, "blackjack")
-        await update_quest_progress(user_id, "blackjack_wins", 1)
-        
-        result_text += f"🎉 <b>Ты выиграл!</b>\n+{win_amount} LC"
-    else:
-        await db.update_balance(user_id, game.bet)
-        result_text += f"🤝 <b>Ничья!</b>\nСтавка возвращена"
-    
-    await update_quest_progress(user_id, "blackjack_bets", 1)
-    await update_quest_progress(user_id, "total_bets", 1)
-    
-    await callback.message.edit_text(
-        f"🃏 <b>БЛЭКДЖЕК - РЕЗУЛЬТАТ</b>\n\n"
-        f"👤 Твои карты: {' '.join([f'{r}{s}' for r,s in game.player_hand])}\n"
-        f"📊 Твоя сумма: {player_value}\n\n"
-        f"{result_text}"
-    )
-    
-    del active_blackjack[user_id]
-    await callback.answer()
+        await callback.message.edit_text(
+            f"🃏 <b>Блэкджек</b>\n\n"
+            f"Твои карты: {hand_to_string(player_hand)} ({player_score})\n"
+            f"Карты дилера: {hand_to_string(dealer_hand)} ({dealer_score})\n\n"
+            f"{result_text}"
+        )
+        await state.clear()
+        await callback.answer()
