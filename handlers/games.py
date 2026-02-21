@@ -3,12 +3,13 @@ from aiogram.types import Message, CallbackQuery
 import random
 
 from database_sqlite import db
-from handlers.status import update_user_status
-from handlers.daily_quests import update_quest_progress
+from handlers.status import update_user_status  # Только этот импорт
 from keyboards.inline import get_casino_menu, get_back_button
 from config import MIN_BET, MAX_BET
 
 router = Router()
+
+# ... остальной код games.py ...
 
 @router.callback_query(F.data == "casino_menu")
 async def show_casino(callback: CallbackQuery):
