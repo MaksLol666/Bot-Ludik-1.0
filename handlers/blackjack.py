@@ -43,7 +43,6 @@ def calculate_hand(hand):
         else:
             total += CARD_VALUES[value]
     
-    # Если перебор и есть тузы, меняем 11 на 1
     while total > 21 and aces > 0:
         total -= 10
         aces -= 1
@@ -69,7 +68,7 @@ async def start_blackjack(message: Message, state: FSMContext):
         return
     
     user_id = message.from_user.id
-    user = await db.get_user(user_id)
+    user = db.get_user(user_id)
     
     if not user:
         await message.answer("❌ Ты не зарегистрирован! Напиши /start")
@@ -91,24 +90,20 @@ async def start_blackjack(message: Message, state: FSMContext):
         await message.answer(f"❌ Максимальная ставка: {MAX_BET} LC")
         return
     
-    # Списываем ставку
-    await db.update_balance(user_id, -bet)
+    db.update_balance(user_id, -bet)
     
-    # Создаем игру
     deck = create_deck()
     player_hand = [deck.pop(), deck.pop()]
     dealer_hand = [deck.pop(), deck.pop()]
     
     player_score = calculate_hand(player_hand)
-    dealer_score = calculate_hand([dealer_hand[0]])  # только первая карта дилера
+    dealer_score = calculate_hand([dealer_hand[0]])
     
-    # Проверка на блэкджек
     if player_score == 21:
-        # Блэкджек у игрока
         win_amount = int(bet * 2.5)
-        await db.update_balance(user_id, win_amount)
-        await db.add_game_stat(user_id, "blackjack", True, bet, win_amount)
-        await update_user_status(user_id)
+        db.update_balance(user_id, win_amount)
+        db.add_game_stat(user_id, "blackjack", True, bet, win_amount)
+        update_user_status(user_id)
         
         await message.answer(
             f"🃏 <b>БЛЭКДЖЕК!</b>\n\n"
@@ -118,7 +113,6 @@ async def start_blackjack(message: Message, state: FSMContext):
         )
         return
     
-    # Сохраняем состояние
     await state.set_state(BlackjackStates.playing)
     await state.update_data(
         bet=bet,
@@ -127,7 +121,6 @@ async def start_blackjack(message: Message, state: FSMContext):
         dealer_hand=dealer_hand
     )
     
-    # Показываем клавиатуру
     from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
     
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
@@ -155,14 +148,12 @@ async def blackjack_action(callback: CallbackQuery, state: FSMContext):
     user_id = callback.from_user.id
     
     if action == "hit":
-        # Игрок берет карту
         player_hand.append(deck.pop())
         player_score = calculate_hand(player_hand)
         
         if player_score > 21:
-            # Перебор - игрок проиграл
-            await db.add_game_stat(user_id, "blackjack", False, bet, 0)
-            await update_user_status(user_id)
+            db.add_game_stat(user_id, "blackjack", False, bet, 0)
+            update_user_status(user_id)
             
             await callback.message.edit_text(
                 f"💔 <b>ПЕРЕБОР!</b>\n\n"
@@ -174,10 +165,8 @@ async def blackjack_action(callback: CallbackQuery, state: FSMContext):
             await callback.answer()
             return
         
-        # Обновляем состояние
         await state.update_data(player_hand=player_hand, deck=deck)
         
-        # Показываем обновленную руку
         from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
         
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
@@ -195,39 +184,32 @@ async def blackjack_action(callback: CallbackQuery, state: FSMContext):
         await callback.answer()
         
     elif action == "stand":
-        # Игрок останавливается - ходит дилер
         player_score = calculate_hand(player_hand)
         dealer_score = calculate_hand(dealer_hand)
         
-        # Дилер берет карты пока не наберет 17+
         while dealer_score < 17:
             dealer_hand.append(deck.pop())
             dealer_score = calculate_hand(dealer_hand)
         
-        # Определяем результат
         if dealer_score > 21:
-            # Дилер перебрал - игрок выиграл
             win_amount = bet * 2
-            await db.update_balance(user_id, win_amount)
-            await db.add_game_stat(user_id, "blackjack", True, bet, win_amount)
+            db.update_balance(user_id, win_amount)
+            db.add_game_stat(user_id, "blackjack", True, bet, win_amount)
             result_text = f"🎉 <b>Ты выиграл! Дилер перебрал</b>\n\n+{win_amount} LC"
         elif dealer_score > player_score:
-            # Дилер выиграл
-            await db.add_game_stat(user_id, "blackjack", False, bet, 0)
+            db.add_game_stat(user_id, "blackjack", False, bet, 0)
             result_text = f"💔 <b>Дилер выиграл</b>\n\n💰 Потеряно: {bet} LC"
         elif dealer_score < player_score:
-            # Игрок выиграл
             win_amount = bet * 2
-            await db.update_balance(user_id, win_amount)
-            await db.add_game_stat(user_id, "blackjack", True, bet, win_amount)
+            db.update_balance(user_id, win_amount)
+            db.add_game_stat(user_id, "blackjack", True, bet, win_amount)
             result_text = f"🎉 <b>Ты выиграл!</b>\n\n+{win_amount} LC"
         else:
-            # Ничья - возврат ставки
-            await db.update_balance(user_id, bet)
-            await db.add_game_stat(user_id, "blackjack", False, bet, 0)
+            db.update_balance(user_id, bet)
+            db.add_game_stat(user_id, "blackjack", False, bet, 0)
             result_text = f"🤝 <b>Ничья</b>\n\n💰 Ставка возвращена: {bet} LC"
         
-        await update_user_status(user_id)
+        update_user_status(user_id)
         
         await callback.message.edit_text(
             f"🃏 <b>Блэкджек</b>\n\n"
