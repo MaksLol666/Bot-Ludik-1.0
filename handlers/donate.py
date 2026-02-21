@@ -3,10 +3,7 @@ from aiogram.types import Message, CallbackQuery
 from aiogram.filters import Command
 
 from database_sqlite import db
-from config import ADMIN_USERNAME, ADMIN_IDS
-from handlers.referral import add_referral_donat
-from handlers.live_stats import track_donation
-from handlers.achievements import check_achievement
+from config import ADMIN_USERNAME
 
 router = Router()
 
@@ -62,6 +59,8 @@ async def show_donate(message: Message):
 
 @router.callback_query(F.data.startswith("donate_"))
 async def process_donate(callback: CallbackQuery):
+    from handlers.referral import add_referral_donat
+    
     data = callback.data.replace("donate_", "")
     
     if data == "business":
@@ -81,45 +80,37 @@ async def process_donate(callback: CallbackQuery):
     if biz_type:
         admin_text += f"🎁 Покупка: Богатый бизнес"
     
-    for admin_id in ADMIN_IDS:
-        try:
-            await callback.bot.send_message(admin_id, admin_text)
-        except:
-            pass
+    await callback.bot.send_message(1691654877, admin_text)
     
     await callback.message.edit_text(
         f"✅ <b>Запрос отправлен!</b>\n\n"
         f"Ты выбрал: {amount}₽\n"
         f"Ожидай подтверждения от админа.\n"
-        f"После оплаты напиши ему: {ADMIN_USERNAME}"
+        f"После оплаты напиши ему: @CIM_KAPTbI_BIO"
     )
     await callback.answer()
 
-async def process_paid_donate(admin_bot, user_id: int, amount_rub: int, is_business: bool = False):
+def process_paid_donate(admin_bot, user_id: int, amount_rub: int, is_business: bool = False):
     if is_business:
-        pool = await db.get_pool()
-        async with pool.acquire() as conn:
-            existing = await conn.fetchrow(
-                "SELECT * FROM business WHERE user_id = $1",
-                user_id
-            )
-            
-            if existing:
-                return False, "У пользователя уже есть бизнес"
-            
-            await conn.execute("""
-                INSERT INTO business (user_id, business_type, last_collected)
-                VALUES ($1, 'paid', NOW())
-            """, user_id)
+        conn = db.get_connection()
         
-        await admin_bot.send_message(
-            user_id,
-            "💎 <b>Тебе выдан Богатый бизнес!</b>\n\n"
-            "Ты будешь получать по 50к #LC каждый день!"
+        cursor = conn.execute(
+            "SELECT * FROM business WHERE user_id = ?",
+            (user_id,)
         )
+        existing = cursor.fetchone()
         
-        await track_donation(user_id, amount_rub)
-        await check_achievement(user_id, "supporter", 1)
+        if existing:
+            return False, "У пользователя уже есть бизнес"
+        
+        conn.execute("""
+            INSERT INTO business (user_id, business_type, last_collected)
+            VALUES (?, 'paid', datetime('now'))
+        """, (user_id,))
+        conn.commit()
+        
+        # Уведомление
+        # await admin_bot.send_message(...) - это асинхронно, нужно вызывать из асинхронной функции
         
         return True, "Бизнес выдан"
     else:
@@ -128,19 +119,14 @@ async def process_paid_donate(admin_bot, user_id: int, amount_rub: int, is_busin
         else:
             lc_amount = amount_rub * 200
         
-        new_balance = await db.update_balance(user_id, lc_amount)
+        new_balance = db.update_balance(user_id, lc_amount)
         
-        glc_amount = (amount_rub // 10) * 10
-        if glc_amount > 0:
-            from handlers.glc import add_glc
-            await add_glc(user_id, glc_amount, f"Donate {amount_rub}₽")
-        
-        referrer_id, bonus = await add_referral_donat(user_id, amount_rub)
+        from handlers.referral import add_referral_donat
+        referrer_id, bonus = add_referral_donat(user_id, amount_rub)
         
         text = (
             f"💰 <b>Донат зачислен!</b>\n\n"
             f"Ты получил: +{lc_amount} #LC\n"
-            f"💎 GLC: +{glc_amount}\n"
             f"Текущий баланс: {new_balance} #LC\n\n"
             f"Спасибо за поддержку! 🎰"
         )
@@ -148,18 +134,6 @@ async def process_paid_donate(admin_bot, user_id: int, amount_rub: int, is_busin
         if referrer_id:
             text += f"\n👥 Твой реферер получил бонус: +{bonus} LC"
         
-        await admin_bot.send_message(user_id, text)
+        # await admin_bot.send_message(...) - асинхронно
         
-        await track_donation(user_id, amount_rub)
-        await check_achievement(user_id, "supporter", 1)
-        
-        # Проверка на кита
-        pool = await db.get_pool()
-        async with pool.acquire() as conn:
-            total_donated = await conn.fetchval("""
-                SELECT COALESCE(SUM(amount), 0) FROM donations WHERE user_id = $1
-            """, user_id) or 0
-        
-        await check_achievement(user_id, "whale", total_donated)
-        
-        return True, f"Начислено {lc_amount} LC и {glc_amount} GLC"
+        return True, f"Начислено {lc_amount} LC"
