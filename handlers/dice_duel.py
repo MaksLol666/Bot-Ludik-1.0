@@ -132,8 +132,6 @@ async def accept_duel(callback: CallbackQuery, state: FSMContext):
         await db.add_game_stat(opponent_id, "dice", False, duel['bet'], 0)
         await update_user_status(winner_id)
         await update_user_status(opponent_id)
-        await update_quest_progress(winner_id, "dice", 1)
-        await update_quest_progress(opponent_id, "dice", 1)
     elif opponent_roll > creator_roll:
         winner_id = opponent_id
         winner_name = duel['opponent_name']
@@ -143,8 +141,6 @@ async def accept_duel(callback: CallbackQuery, state: FSMContext):
         await db.add_game_stat(duel['creator'], "dice", False, duel['bet'], 0)
         await update_user_status(winner_id)
         await update_user_status(duel['creator'])
-        await update_quest_progress(winner_id, "dice", 1)
-        await update_quest_progress(duel['creator'], "dice", 1)
     else:
         await db.update_balance(duel['creator'], duel['bet'])
         await db.update_balance(opponent_id, duel['bet'])
