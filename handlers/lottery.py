@@ -6,7 +6,6 @@ from datetime import datetime, timedelta
 
 from database_sqlite import db
 from handlers.status import update_user_status
-from handlers.daily_quests import update_quest_progress
 from keyboards.inline import get_back_button
 
 router = Router()
