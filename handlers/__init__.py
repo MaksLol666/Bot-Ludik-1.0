@@ -12,10 +12,12 @@ from . import donate
 from . import bonus
 from . import referral
 from . import admin
-from . import transfers  # Добавили
+from . import transfers
+from . import blackjack  # ДОБАВИТЬ
 
 __all__ = [
     'start', 'games', 'dice_duel', 'mines', 'lottery',
     'profile', 'top', 'status', 'promo', 'business',
-    'donate', 'bonus', 'referral', 'admin', 'transfers'
+    'donate', 'bonus', 'referral', 'admin', 'transfers',
+    'blackjack'  # ДОБАВИТЬ
 ]
