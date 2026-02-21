@@ -1,7 +1,7 @@
 from database_sqlite import db
 
 async def create_start_promos():
-    """Создание стартовых промокодов (АСИНХРОННАЯ)"""
+    """Создание стартовых промокодов"""
     conn = await db.get_connection()
     
     await conn.execute("""
