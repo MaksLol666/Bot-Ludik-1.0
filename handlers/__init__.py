@@ -13,11 +13,13 @@ from . import bonus
 from . import referral
 from . import admin
 from . import transfers
-from . import blackjack  # ДОБАВИТЬ
+from . import blackjack
+from . import glc
+from . import roulette  # ДОБАВИТЬ
 
 __all__ = [
     'start', 'games', 'dice_duel', 'mines', 'lottery',
     'profile', 'top', 'status', 'promo', 'business',
     'donate', 'bonus', 'referral', 'admin', 'transfers',
-    'blackjack'  # ДОБАВИТЬ
+    'blackjack', 'glc', 'roulette'  # ДОБАВИТЬ
 ]
