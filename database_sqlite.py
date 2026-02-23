@@ -46,7 +46,7 @@ class Database:
             )
         """)
 
-        # Статистика игр
+        # Статистика игр (детальная)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS game_stats (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -129,7 +129,7 @@ class Database:
             )
         """)
 
-        # Статусы игроков
+        # Статусы игроков (топы)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS user_status (
                 user_id INTEGER PRIMARY KEY,
@@ -139,7 +139,7 @@ class Database:
             )
         """)
 
-        # Логи действий
+        # Логи действий (для админ-панели)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS user_logs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -151,7 +151,7 @@ class Database:
             )
         """)
 
-        # Переводы
+        # Переводы между пользователями
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS transfers (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -161,6 +161,19 @@ class Database:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (from_user) REFERENCES users(user_id),
                 FOREIGN KEY (to_user) REFERENCES users(user_id)
+            )
+        """)
+
+        # GLC статусы (покупаемые)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS glc_statuses (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                status_key TEXT,
+                status_name TEXT,
+                status_icon TEXT,
+                purchased_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(user_id)
             )
         """)
 
@@ -243,6 +256,42 @@ class Database:
             cursor.execute("UPDATE users SET total_lost = total_lost + ? WHERE user_id = ?", (bet, user_id))
         
         conn.commit()
+        self.log_action(user_id, f"игра_{game}", f"{'win' if win else 'lose'}: {bet}")
+
+    def transfer_lc(self, from_user: int, to_user: int, amount: int) -> tuple[bool, str]:
+        """Перевод LC между пользователями"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        # Проверяем отправителя
+        sender = self.get_user(from_user)
+        if not sender:
+            return False, "Отправитель не найден"
+        
+        if sender['balance_lc'] < amount:
+            return False, "Недостаточно средств"
+        
+        # Проверяем получателя
+        receiver = self.get_user(to_user)
+        if not receiver:
+            return False, "Получатель не найден"
+        
+        # Выполняем перевод
+        cursor.execute("UPDATE users SET balance_lc = balance_lc - ? WHERE user_id = ?", (amount, from_user))
+        cursor.execute("UPDATE users SET balance_lc = balance_lc + ? WHERE user_id = ?", (amount, to_user))
+        
+        # Логируем перевод
+        cursor.execute("""
+            INSERT INTO transfers (from_user, to_user, amount)
+            VALUES (?, ?, ?)
+        """, (from_user, to_user, amount))
+        
+        conn.commit()
+        
+        self.log_action(from_user, "перевод", f"отправил {amount} LC пользователю {to_user}")
+        self.log_action(to_user, "перевод", f"получил {amount} LC от {from_user}")
+        
+        return True, "Перевод выполнен успешно"
 
     def log_action(self, user_id: int, action: str, details: str = ""):
         """Записать действие пользователя"""
@@ -254,8 +303,98 @@ class Database:
         """, (user_id, action, details))
         conn.commit()
 
-# ===== ЭТО САМОЕ ВАЖНОЕ - СОЗДАЕМ ЭКЗЕМПЛЯР =====
-# Добавь эти строки в самый конец файла!
+    def get_user_full_info(self, identifier) -> Dict[str, Any]:
+        """Получить полную информацию о пользователе (по id или username)"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        # Определяем, что ищем
+        if isinstance(identifier, int):
+            user = self.get_user(identifier)
+        else:
+            user = self.get_user_by_username(identifier)
+        
+        if not user:
+            return {"error": "Пользователь не найден"}
+        
+        user_id = user['user_id']
+        
+        # Получаем статистику по играм
+        cursor.execute("""
+            SELECT 
+                game_type,
+                COUNT(*) as total_games,
+                SUM(CASE WHEN win THEN 1 ELSE 0 END) as wins,
+                SUM(CASE WHEN win THEN 0 ELSE 1 END) as losses,
+                SUM(bet) as total_bet,
+                SUM(win_amount) as total_won
+            FROM game_stats
+            WHERE user_id = ?
+            GROUP BY game_type
+        """, (user_id,))
+        game_stats = [dict(row) for row in cursor.fetchall()]
+        
+        # Получаем логи действий
+        cursor.execute("""
+            SELECT action, details, created_at
+            FROM user_logs
+            WHERE user_id = ?
+            ORDER BY created_at DESC
+            LIMIT 50
+        """, (user_id,))
+        logs = [dict(row) for row in cursor.fetchall()]
+        
+        # Получаем переводы
+        cursor.execute("""
+            SELECT * FROM transfers 
+            WHERE from_user = ? OR to_user = ?
+            ORDER BY created_at DESC
+            LIMIT 20
+        """, (user_id, user_id))
+        transfers = [dict(row) for row in cursor.fetchall()]
+        
+        # Получаем рефералов
+        cursor.execute("""
+            SELECT u.user_id, u.username, u.registered_at
+            FROM referrals r
+            JOIN users u ON r.referral_id = u.user_id
+            WHERE r.referrer_id = ?
+        """, (user_id,))
+        referrals = [dict(row) for row in cursor.fetchall()]
+        
+        # Бизнес
+        cursor.execute("SELECT * FROM business WHERE user_id = ?", (user_id,))
+        business = cursor.fetchone()
+        
+        # Лотерея
+        cursor.execute("""
+            SELECT * FROM lottery_tickets 
+            WHERE user_id = ? 
+            ORDER BY purchase_date DESC
+        """, (user_id,))
+        lottery = [dict(row) for row in cursor.fetchall()]
+        
+        # GLC статусы
+        cursor.execute("""
+            SELECT * FROM glc_statuses 
+            WHERE user_id = ? 
+            ORDER BY purchased_at DESC
+        """, (user_id,))
+        glc_statuses = [dict(row) for row in cursor.fetchall()]
+        
+        return {
+            "user": dict(user),
+            "game_stats": game_stats,
+            "logs": logs,
+            "transfers": transfers,
+            "referrals": referrals,
+            "business": dict(business) if business else None,
+            "lottery": lottery,
+            "glc_statuses": glc_statuses,
+            "total_games": sum(s['total_games'] for s in game_stats),
+            "total_wins": sum(s['wins'] for s in game_stats),
+            "total_losses": sum(s['losses'] for s in game_stats)
+        }
 
 # Создаем глобальный экземпляр
 db = Database()
