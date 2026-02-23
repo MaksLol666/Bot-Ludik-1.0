@@ -11,7 +11,7 @@ from database_sqlite import db
 from handlers import (
     start, games, dice_duel, mines, lottery, profile, top, status,
     promo, business, donate, bonus, referral, admin, transfers,
-    blackjack  # ДОБАВИТЬ
+    blackjack, glc, roulette  # ДОБАВИТЬ
 )
 from utils.promo_setup import create_start_promos
 
@@ -21,10 +21,8 @@ logger = logging.getLogger(__name__)
 async def on_startup(bot: Bot):
     logger.info("Запуск бота...")
     
-    # Создаем стартовые промокоды
     create_start_promos()
     
-    # Планировщик для лотереи
     scheduler = AsyncIOScheduler()
     scheduler.add_job(
         lottery.draw_lottery, 
@@ -49,7 +47,6 @@ async def main():
     )
     dp = Dispatcher(storage=MemoryStorage())
     
-    # Роутеры
     dp.include_router(start.router)
     dp.include_router(games.router)
     dp.include_router(dice_duel.router)
@@ -65,7 +62,9 @@ async def main():
     dp.include_router(referral.router)
     dp.include_router(admin.router)
     dp.include_router(transfers.router)
-    dp.include_router(blackjack.router)  # ДОБАВИТЬ
+    dp.include_router(blackjack.router)
+    dp.include_router(glc.router)
+    dp.include_router(roulette.router)  # ДОБАВИТЬ
     
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
