@@ -19,6 +19,7 @@ TOP_TYPES = {
 }
 
 async def get_top_balance(limit: int = 10):
+    """Топ по балансу"""
     conn = db.get_connection()
     cursor = conn.execute("""
         SELECT user_id, username, balance_lc 
@@ -31,6 +32,7 @@ async def get_top_balance(limit: int = 10):
     return rows
 
 async def get_top_game(game: str, limit: int = 10):
+    """Топ по конкретной игре"""
     conn = db.get_connection()
     cursor = conn.execute("""
         SELECT u.user_id, u.username, 
@@ -48,6 +50,7 @@ async def get_top_game(game: str, limit: int = 10):
 
 @router.message(Command("tb", "tr", "ts", "tk", "tm", "tl", "tbj"))
 async def show_top(message: Message):
+    """Показать топ по команде"""
     cmd = message.text[1:]
     
     if cmd not in TOP_TYPES:
@@ -82,16 +85,61 @@ async def show_top(message: Message):
 
 @router.callback_query(F.data == "top_menu")
 async def top_menu(callback: CallbackQuery):
+    """Меню выбора топа"""
     text = (
         "🏆 <b>Топы игроков</b>\n\n"
-        "Выбери категорию:\n\n"
-        "💰 /tb - топ богачей\n"
-        "🃏 /tr - топ рулетки\n"
-        "🎰 /ts - топ слотов\n"
-        "🎲 /tk - топ костей\n"
-        "💣 /tm - топ мин\n"
-        "🎟️ /tl - топ лотереи\n"
-        "🃏 /tbj - топ блэкджека"
+        "Выбери категорию:"
     )
-    await callback.message.edit_text(text, reply_markup=get_back_button())
+    from keyboards.inline import get_top_keyboard
+    await callback.message.edit_text(text, reply_markup=get_top_keyboard())
     await callback.answer()
+
+async def show_top_command(message: Message, cmd: str):
+    """Показать конкретный топ (для инлайн кнопок)"""
+    if cmd == "tb":
+        rows = await get_top_balance(10)
+        text = "💰 <b>Топ богачей</b>\n\n"
+        for i, row in enumerate(rows, 1):
+            display_name = get_display_name(row[0], row[1] or f"id{row[0]}")
+            text += f"{i}. {display_name} — {row[2]} LC\n"
+    elif cmd == "tr":
+        rows = await get_top_game("roulette", 10)
+        text = "🃏 <b>Топ рулетки</b>\n\n"
+        for i, row in enumerate(rows, 1):
+            display_name = get_display_name(row[0], row[1] or f"id{row[0]}")
+            text += f"{i}. {display_name} — {row[3]} LC выиграно\n"
+    elif cmd == "ts":
+        rows = await get_top_game("slots", 10)
+        text = "🎰 <b>Топ слотов</b>\n\n"
+        for i, row in enumerate(rows, 1):
+            display_name = get_display_name(row[0], row[1] or f"id{row[0]}")
+            text += f"{i}. {display_name} — {row[3]} LC выиграно\n"
+    elif cmd == "tk":
+        rows = await get_top_game("dice", 10)
+        text = "🎲 <b>Топ костей</b>\n\n"
+        for i, row in enumerate(rows, 1):
+            display_name = get_display_name(row[0], row[1] or f"id{row[0]}")
+            text += f"{i}. {display_name} — {row[3]} LC выиграно\n"
+    elif cmd == "tm":
+        rows = await get_top_game("mines", 10)
+        text = "💣 <b>Топ мин</b>\n\n"
+        for i, row in enumerate(rows, 1):
+            display_name = get_display_name(row[0], row[1] or f"id{row[0]}")
+            text += f"{i}. {display_name} — {row[3]} LC выиграно\n"
+    elif cmd == "tl":
+        rows = await get_top_game("lottery", 10)
+        text = "🎟 <b>Топ лотереи</b>\n\n"
+        for i, row in enumerate(rows, 1):
+            display_name = get_display_name(row[0], row[1] or f"id{row[0]}")
+            text += f"{i}. {display_name} — {row[3]} LC выиграно\n"
+    elif cmd == "tbj":
+        rows = await get_top_game("blackjack", 10)
+        text = "🃏 <b>Топ блэкджека</b>\n\n"
+        for i, row in enumerate(rows, 1):
+            display_name = get_display_name(row[0], row[1] or f"id{row[0]}")
+            text += f"{i}. {display_name} — {row[3]} LC выиграно\n"
+    else:
+        await message.answer("❌ Неизвестный топ")
+        return
+    
+    await message.edit_text(text, reply_markup=get_back_button())
