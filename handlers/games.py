@@ -4,143 +4,29 @@ import random
 
 from database_sqlite import db
 from handlers.status import update_user_status
-from keyboards.inline import get_casino_menu, get_back_button
 from config import MIN_BET, MAX_BET
+from keyboards.inline import get_back_button
 
 router = Router()
 
-@router.callback_query(F.data == "casino_menu")
-async def show_casino(callback: CallbackQuery):
-    await callback.message.edit_text(
-        "🎰 <b>Казино Лудик</b>\n\n"
-        "Выбери игру:",
-        reply_markup=get_casino_menu()
-    )
-    await callback.answer()
+# Значения слотов из Telegram
+SLOT_VALUES = {
+    64: {"name": "777", "display": "7️⃣7️⃣7️⃣", "multiplier": 10, "win_name": "ДЖЕКПОТ"},
+    1: {"name": "BAR", "display": "💎💎💎", "multiplier": 5, "win_name": "БАР"},
+    43: {"name": "LEMON", "display": "🍋🍋🍋", "multiplier": 3, "win_name": "ЛИМОНЫ"},
+    22: {"name": "CHERRY", "display": "🍒🍒🍒", "multiplier": 3, "win_name": "ВИШНИ"},
+}
 
-@router.callback_query(F.data == "game_roulette")
-async def roulette_help(callback: CallbackQuery):
-    text = (
-        "🃏 <b>Рулетка</b>\n\n"
-        "<b>Как играть:</b>\n"
-        "Напиши в чат команду:\n"
-        "<code>рул [цвет/число] [ставка]</code>\n\n"
-        "<b>Примеры:</b>\n"
-        "рул красное 1000\n"
-        "рул черное 500\n"
-        "рул 7 2000\n\n"
-        "💰 <b>Коэффициенты:</b>\n"
-        "Цвет (красное/черное) — x2\n"
-        "Число (0-36) — x36"
-    )
-    await callback.message.edit_text(text, reply_markup=get_back_button())
-    await callback.answer()
+# Все возможные значения для симуляции
+ALL_SLOT_VALUES = list(range(1, 65))
 
-@router.callback_query(F.data == "game_slots")
-async def slots_help(callback: CallbackQuery):
-    text = (
-        "🎰 <b>Слоты</b>\n\n"
-        "<b>Как играть:</b>\n"
-        "Напиши в чат команду:\n"
-        "<code>слоты [ставка]</code>\n\n"
-        "<b>Пример:</b>\n"
-        "слоты 1000\n\n"
-        "<b>Выигрышные комбинации:</b>\n"
-        "🍒🍒🍒 — x3\n"
-        "🍋🍋🍋 — x5\n"
-        "💎💎💎 — x10\n"
-        "7️⃣7️⃣7️⃣ — x20"
-    )
-    await callback.message.edit_text(text, reply_markup=get_back_button())
-    await callback.answer()
-
-@router.message(F.text.lower().startswith("рул"))
-async def process_roulette(message: Message):
-    parts = message.text.split()
-    if len(parts) < 3:
-        await message.answer("❌ Формат: рул [цвет/число] [ставка]")
-        return
-    
-    bet_type = parts[1].lower()
-    try:
-        bet = int(parts[2])
-    except:
-        await message.answer("❌ Ставка должна быть числом")
-        return
-    
-    user_id = message.from_user.id
-    user = db.get_user(user_id)
-    
-    if not user:
-        await message.answer("❌ Ты не зарегистрирован! Напиши /start")
-        return
-    
-    if user['is_banned']:
-        await message.answer("⛔ Ты забанен!")
-        return
-    
-    if bet < MIN_BET:
-        await message.answer(f"❌ Минимальная ставка: {MIN_BET} LC")
-        return
-    
-    if bet > user['balance_lc']:
-        await message.answer("❌ Недостаточно средств!")
-        return
-    
-    db.update_balance(user_id, -bet)
-    
-    result = random.randint(0, 36)
-    
-    red_numbers = [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36]
-    black_numbers = [2,4,6,8,10,11,13,15,17,20,22,24,26,28,29,31,33,35]
-    
-    if result == 0:
-        color = "зеленое"
-    elif result in red_numbers:
-        color = "красное"
-    else:
-        color = "черное"
-    
-    win = False
-    win_amount = 0
-    
-    if bet_type.isdigit():
-        if int(bet_type) == result:
-            win = True
-            win_amount = bet * 36
-    else:
-        if bet_type == "красное" and color == "красное":
-            win = True
-            win_amount = bet * 2
-        elif bet_type == "черное" and color == "черное":
-            win = True
-            win_amount = bet * 2
-    
-    if win:
-        db.add_game_stat(user_id, "roulette", True, bet, win_amount)
-        update_user_status(user_id)
-        await message.answer(
-            f"🎉 <b>Ты выиграл!</b>\n\n"
-            f"Выпало: {result} ({color})\n"
-            f"Ставка: {bet} LC\n"
-            f"Выигрыш: +{win_amount} LC\n"
-            f"💰 Баланс: {user['balance_lc'] - bet + win_amount} LC"
-        )
-    else:
-        db.add_game_stat(user_id, "roulette", False, bet, 0)
-        update_user_status(user_id)
-        await message.answer(
-            f"💔 <b>Ты проиграл!</b>\n\n"
-            f"Выпало: {result} ({color})\n"
-            f"Ставка: {bet} LC\n"
-            f"💰 Баланс: {user['balance_lc'] - bet} LC"
-        )
-
-@router.message(F.text.lower().startswith("слоты"))
+@router.message(F.text.lower().startswith(("слоты", "слот")))
 async def process_slots(message: Message):
+    """Обработчик слотов (текстовая команда)"""
     parts = message.text.split()
+    
     if len(parts) < 2:
-        await message.answer("❌ Формат: слоты [ставка]")
+        await message.answer("❌ Формат: слоты [ставка]\nПример: слоты 1000")
         return
     
     try:
@@ -168,44 +54,105 @@ async def process_slots(message: Message):
         await message.answer("❌ Недостаточно средств!")
         return
     
+    if bet > MAX_BET:
+        await message.answer(f"❌ Максимальная ставка: {MAX_BET} LC")
+        return
+    
+    # Списываем ставку
     db.update_balance(user_id, -bet)
     
-    symbols = ["🍒", "🍋", "💎", "7️⃣"]
-    weights = [0.5, 0.3, 0.15, 0.05]
+    # Отправляем сообщение о начале игры
+    msg = await message.answer("🎰 <b>Слоты</b>\n\n🎰 Крутим барабаны...")
     
-    spin = random.choices(symbols, weights=weights, k=3)
+    # Имитируем анимацию
+    await msg.edit_text("🎰 <b>Слоты</b>\n\n🎰 🎰 Крутим...")
+    await msg.edit_text("🎰 <b>Слоты</b>\n\n🎰 🎰 🎰 Крутим...")
     
-    win_mult = 0
-    if spin[0] == spin[1] == spin[2]:
-        if spin[0] == "🍒":
-            win_mult = 3
-        elif spin[0] == "🍋":
-            win_mult = 5
-        elif spin[0] == "💎":
-            win_mult = 10
-        elif spin[0] == "7️⃣":
-            win_mult = 20
+    # Генерируем результат
+    result_value = random.choice(ALL_SLOT_VALUES)
     
-    if win_mult > 0:
-        win_amount = bet * win_mult
+    # Проверяем выигрыш
+    if result_value in SLOT_VALUES:
+        slot_info = SLOT_VALUES[result_value]
+        win_multiplier = slot_info["multiplier"]
+        win_amount = bet * win_multiplier
+        
+        # Начисляем выигрыш
+        db.update_balance(user_id, win_amount)
         db.add_game_stat(user_id, "slots", True, bet, win_amount)
         update_user_status(user_id)
+        
         result_text = (
-            f"🎰 <b>Слоты</b>\n\n"
-            f"{' '.join(spin)}\n\n"
-            f"🎉 <b>Ты выиграл!</b>\n"
-            f"Коэффициент: x{win_mult}\n"
-            f"Выигрыш: +{win_amount} LC\n"
-            f"💰 Баланс: {user['balance_lc'] - bet + win_amount} LC"
+            f"🎰 <b>СЛОТЫ - {slot_info['win_name']}!</b>\n\n"
+            f"{slot_info['display']}\n\n"
+            f"💰 Ставка: {bet} LC\n"
+            f"📈 Коэффициент: x{win_multiplier}\n"
+            f"💎 Выигрыш: +{win_amount} LC\n\n"
+            f"🪙 Текущий баланс: {user['balance_lc'] - bet + win_amount} LC"
         )
     else:
         db.add_game_stat(user_id, "slots", False, bet, 0)
         update_user_status(user_id)
+        
+        random_display = f"{random.choice(['🍒','🍋','💎','7️⃣'])} {random.choice(['🍒','🍋','💎','7️⃣'])} {random.choice(['🍒','🍋','💎','7️⃣'])}"
+        
         result_text = (
-            f"🎰 <b>Слоты</b>\n\n"
-            f"{' '.join(spin)}\n\n"
-            f"💔 <b>Ты проиграл!</b>\n"
-            f"💰 Баланс: {user['balance_lc'] - bet} LC"
+            f"🎰 <b>СЛОТЫ - ПРОИГРЫШ</b>\n\n"
+            f"{random_display}\n\n"
+            f"💰 Ставка: {bet} LC\n"
+            f"💔 Потеряно: {bet} LC\n\n"
+            f"🪙 Текущий баланс: {user['balance_lc'] - bet} LC"
         )
     
-    await message.answer(result_text)
+    await msg.edit_text(result_text)
+
+@router.message(F.dice.emoji == "🎰")
+async def handle_slots_dice(message: Message):
+    """Обработчик реальных слотов Telegram"""
+    user_id = message.from_user.id
+    user = db.get_user(user_id)
+    
+    if not user or user['is_banned']:
+        return
+    
+    value = message.dice.value
+    
+    if value in SLOT_VALUES:
+        slot_info = SLOT_VALUES[value]
+        bet = 100  # Фиксированная ставка для дайсов
+        
+        if user['balance_lc'] >= bet:
+            db.update_balance(user_id, -bet)
+            win_amount = bet * slot_info["multiplier"]
+            db.update_balance(user_id, win_amount)
+            db.add_game_stat(user_id, "slots", True, bet, win_amount)
+            update_user_status(user_id)
+            
+            await message.reply(
+                f"🎰 <b>СЛОТЫ - {slot_info['win_name']}!</b>\n\n"
+                f"{slot_info['display']}\n\n"
+                f"💰 Ставка: {bet} LC\n"
+                f"📈 Коэффициент: x{slot_info['multiplier']}\n"
+                f"💎 Выигрыш: +{win_amount} LC"
+            )
+
+@router.callback_query(F.data == "game_slots")
+async def slots_help(callback: CallbackQuery):
+    """Помощь по слотам"""
+    text = (
+        "🎰 <b>Слоты</b>\n\n"
+        "<b>Как играть:</b>\n"
+        "Напиши команду:\n"
+        "<code>слоты [ставка]</code>\n\n"
+        "<b>Пример:</b>\n"
+        "<code>слоты 1000</code>\n\n"
+        "<b>Выигрышные комбинации:</b>\n"
+        "• 7️⃣7️⃣7️⃣ — x10 (ДЖЕКПОТ)\n"
+        "• 💎💎💎 — x5\n"
+        "• 🍋🍋🍋 — x3\n"
+        "• 🍒🍒🍒 — x3\n\n"
+        "<b>Шанс выигрыша:</b> ~6%"
+    )
+    
+    await callback.message.edit_text(text, reply_markup=get_back_button())
+    await callback.answer()
