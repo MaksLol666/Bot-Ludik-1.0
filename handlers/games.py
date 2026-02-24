@@ -4,6 +4,7 @@ import random
 
 from database_sqlite import db
 from handlers.status import update_user_status
+from handlers.subscription_check import require_subscription
 from config import MIN_BET, MAX_BET
 from keyboards.inline import get_back_button
 
@@ -21,6 +22,7 @@ SLOT_VALUES = {
 ALL_SLOT_VALUES = list(range(1, 65))
 
 @router.message(F.text.lower().startswith(("слоты", "слот")))
+@require_subscription()
 async def process_slots(message: Message):
     """Обработчик слотов (текстовая команда)"""
     parts = message.text.split()
@@ -37,14 +39,6 @@ async def process_slots(message: Message):
     
     user_id = message.from_user.id
     user = db.get_user(user_id)
-    
-    if not user:
-        await message.answer("❌ Ты не зарегистрирован! Напиши /start")
-        return
-    
-    if user['is_banned']:
-        await message.answer("⛔ Ты забанен!")
-        return
     
     if bet < MIN_BET:
         await message.answer(f"❌ Минимальная ставка: {MIN_BET} LC")
@@ -107,6 +101,7 @@ async def process_slots(message: Message):
     await msg.edit_text(result_text)
 
 @router.message(F.dice.emoji == "🎰")
+@require_subscription()
 async def handle_slots_dice(message: Message):
     """Обработчик реальных слотов Telegram"""
     user_id = message.from_user.id
