@@ -7,7 +7,7 @@ from keyboards.inline import get_back_button, get_glc_shop_keyboard
 
 router = Router()
 
-# Статусы за GLC
+# Статусы за GLC (ПОЛНЫЙ СПИСОК)
 GLC_STATUSES = {
     # 2.500
     "dev": {"name": "Разработчик", "icon": "👨‍💻", "price": 2500},
@@ -148,6 +148,13 @@ async def show_shop_page(message: Message, user: dict, owned_keys: list, pages: 
         else:
             text += f"⬜ {status['icon']} {status['name']} — {status['price']} GLC\n"
     
+    # Добавляем кнопки навигации
+    nav_buttons = []
+    if page > 0:
+        nav_buttons.append(f"◀️ Предыдущая")
+    if page < len(pages) - 1:
+        nav_buttons.append(f"Следующая ▶️")
+    
     await message.edit_text(text, reply_markup=get_glc_shop_keyboard(page, len(pages)))
 
 @router.callback_query(F.data.startswith("shop_page_"))
@@ -254,7 +261,7 @@ def add_glc(user_id: int, amount: int, reason: str = ""):
     db.log_action(user_id, "glc", f"+{amount} | {reason}")
     return True
 
-# ===== НОВЫЕ ФУНКЦИИ ДЛЯ REPLY КНОПОК =====
+# ===== ФУНКЦИИ ДЛЯ REPLY КНОПОК =====
 
 async def glc_menu_reply(message: Message):
     """Меню GLC для Reply кнопки"""
