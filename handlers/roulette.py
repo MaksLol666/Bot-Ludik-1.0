@@ -154,7 +154,9 @@ def get_result_info(result: int) -> dict:
     return info
 
 @router.message(F.text.lower().startswith(("рул", "рулетка")))
+@require_subscription()
 async def process_roulette(message: Message):
+    # ... остальной код
     """Обработчик рулетки"""
     # Парсим сообщение
     text = message.text.lower()
