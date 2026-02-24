@@ -1,22 +1,21 @@
 from .inline import *
-from .roulette import get_roulette_keyboard, get_roulette_bet_keyboard
+from .reply import *
 
 __all__ = [
+    # Inline клавиатуры
     'get_start_keyboard',
-    'get_main_menu', 
+    'get_main_menu',
     'get_casino_menu',
     'get_business_menu',
+    'get_top_keyboard',
     'get_back_button',
-    'get_roulette_keyboard',
-    'get_roulette_bet_keyboard',
-    'get_vip_market_keyboard',
-    'get_vip_statuses_keyboard',
-    'get_confirm_keyboard',
-    'get_inventory_keyboard',
-    'get_daily_quests_keyboard',
-    'get_blackjack_keyboard',
-    'get_crash_keyboard',
-    'get_poker_keyboard',
-    'get_poker_start_keyboard',
-    'get_poker_actions_keyboard'
+    'get_glc_shop_keyboard',
+    
+    # Reply клавиатуры
+    'get_main_menu_keyboard',
+    'get_casino_reply_keyboard',
+    'get_business_reply_keyboard',
+    'get_top_reply_keyboard',
+    'get_glc_reply_keyboard',
+    'remove_keyboard'
 ]
