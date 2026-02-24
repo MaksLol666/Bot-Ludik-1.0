@@ -128,3 +128,14 @@ async def cmd_promo(message: Message):
         f"+{promo[1]} LC\n"
         f"Баланс: {new_balance} LC"
     )
+
+# ===== НОВАЯ ФУНКЦИЯ ДЛЯ REPLY КНОПКИ =====
+
+async def promo_start_reply(message: Message):
+    """Начало активации промокода для Reply кнопки"""
+    await message.answer(
+        "🎫 <b>Активация промокода</b>\n\n"
+        "Введи промокод командой:\n"
+        "<code>/promo КОД</code>\n\n"
+        "Пример: <code>/promo NEW</code>"
+    )
