@@ -26,7 +26,9 @@ class MinesStates(StatesGroup):
     playing = State()
 
 @router.message(F.text.lower().startswith("мины"))
+@require_subscription()
 async def start_mines(message: Message, state: FSMContext):
+    # ... остальной код
     parts = message.text.split()
     if len(parts) < 2:
         await message.answer("❌ Формат: мины [ставка]")
