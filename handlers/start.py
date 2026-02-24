@@ -1,13 +1,18 @@
 from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, CallbackQuery, ReplyKeyboardMarkup, KeyboardButton
 from aiogram.filters import Command
-from aiogram.enums import ChatMemberStatus
+from aiogram.enums import ChatMemberStatus, ChatType
 
 from config import CHANNEL_ID, CHANNEL_LINK, ADMIN_USERNAME, BOT_VERSION, BOT_RELEASE_DATE
 from database_sqlite import db
-from keyboards.inline import get_start_keyboard, get_main_menu
+from keyboards.inline import get_start_keyboard, get_main_menu as get_inline_main_menu
+from keyboards.reply import get_main_menu_keyboard
 
 router = Router()
+
+def is_private_chat(message: Message) -> bool:
+    """Проверяет, является ли чат личным"""
+    return message.chat.type == ChatType.PRIVATE
 
 @router.message(Command("start"))
 async def cmd_start(message: Message):
@@ -49,9 +54,16 @@ async def cmd_start(message: Message):
                     reply_markup=get_start_keyboard()
                 )
             else:
-                await message.answer(welcome_text, reply_markup=get_main_menu())
+                # В ЛС показываем Reply клавиатуру, в группах - Inline
+                if is_private_chat(message):
+                    await message.answer(welcome_text, reply_markup=get_main_menu_keyboard())
+                else:
+                    await message.answer(welcome_text, reply_markup=get_inline_main_menu())
         except:
-            await message.answer(welcome_text, reply_markup=get_main_menu())
+            if is_private_chat(message):
+                await message.answer(welcome_text, reply_markup=get_main_menu_keyboard())
+            else:
+                await message.answer(welcome_text, reply_markup=get_inline_main_menu())
     else:
         if user['is_banned']:
             await message.answer(
@@ -61,11 +73,18 @@ async def cmd_start(message: Message):
             )
             return
         
-        await message.answer(
-            f"🎲 <b>С возвращением, {first_name}!</b>\n\n"
-            f"💰 Твой баланс: {user['balance_lc']} #LC",
-            reply_markup=get_main_menu()
-        )
+        if is_private_chat(message):
+            await message.answer(
+                f"🎲 <b>С возвращением, {first_name}!</b>\n\n"
+                f"💰 Твой баланс: {user['balance_lc']} #LC",
+                reply_markup=get_main_menu_keyboard()
+            )
+        else:
+            await message.answer(
+                f"🎲 <b>С возвращением, {first_name}!</b>\n\n"
+                f"💰 Твой баланс: {user['balance_lc']} #LC",
+                reply_markup=get_inline_main_menu()
+            )
 
 @router.message(Command("play"))
 async def cmd_play(message: Message):
@@ -85,12 +104,19 @@ async def cmd_play(message: Message):
                 reply_markup=get_start_keyboard()
             )
         else:
-            await message.answer("🎮 Игровой зал:", reply_markup=get_main_menu())
+            if is_private_chat(message):
+                await message.answer("🎮 Игровой зал:", reply_markup=get_main_menu_keyboard())
+            else:
+                await message.answer("🎮 Игровой зал:", reply_markup=get_inline_main_menu())
     except:
-        await message.answer("🎮 Игровой зал:", reply_markup=get_main_menu())
+        if is_private_chat(message):
+            await message.answer("🎮 Игровой зал:", reply_markup=get_main_menu_keyboard())
+        else:
+            await message.answer("🎮 Игровой зал:", reply_markup=get_inline_main_menu())
 
 @router.callback_query(F.data == "info")
 async def show_info(callback: CallbackQuery):
+    """Показать информацию о боте"""
     info_text = (
         f"<b>Информация о боте \"Лудик {BOT_VERSION}\"</b>\n\n"
         f"👑 <b>Владелец:</b> {ADMIN_USERNAME}\n"
@@ -104,9 +130,18 @@ async def show_info(callback: CallbackQuery):
     await callback.message.edit_text(info_text, reply_markup=get_start_keyboard())
     await callback.answer()
 
+@router.message(F.text == "◀️ Назад в меню")
+async def back_to_menu_reply(message: Message):
+    """Обработчик кнопки назад в Reply клавиатуре"""
+    if is_private_chat(message):
+        await message.answer("🎮 Главное меню:", reply_markup=get_main_menu_keyboard())
+    else:
+        await message.answer("🎮 Главное меню:", reply_markup=get_inline_main_menu())
+
 @router.callback_query(F.data == "back_to_main")
 async def back_to_main(callback: CallbackQuery):
-    await callback.message.edit_text("🎮 Главное меню:", reply_markup=get_main_menu())
+    """Обработчик кнопки назад в Inline клавиатуре"""
+    await callback.message.edit_text("🎮 Главное меню:", reply_markup=get_inline_main_menu())
     await callback.answer()
 
 @router.callback_query(F.data == "check_sub")
@@ -119,6 +154,6 @@ async def check_subscription(callback: CallbackQuery):
             await callback.answer("❌ Ты все еще не подписан!", show_alert=True)
         else:
             await callback.answer("✅ Подписка подтверждена! Игры доступны.", show_alert=True)
-            await callback.message.edit_text("🎮 Игровой зал:", reply_markup=get_main_menu())
+            await callback.message.edit_text("🎮 Игровой зал:", reply_markup=get_inline_main_menu())
     except:
         await callback.answer("❌ Ошибка проверки", show_alert=True)
