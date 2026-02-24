@@ -270,3 +270,59 @@ async def draw_lottery(bot):
     
     await bot.send_message("@BotLudik_chanels", results_text)
     return results_text
+
+# ===== НОВАЯ ФУНКЦИЯ ДЛЯ REPLY КНОПКИ =====
+
+async def lottery_menu_reply(message: Message):
+    """Обработчик для Reply кнопки лотереи"""
+    user_id = message.from_user.id
+    
+    conn = db.get_connection()
+    
+    current_week = get_current_week_number()
+    
+    cursor = conn.execute("""
+        SELECT COALESCE(SUM(ticket_count), 0) as total
+        FROM lottery_tickets 
+        WHERE week_number = ?
+    """, (current_week,))
+    row = cursor.fetchone()
+    tickets_total = row[0] if row else 0
+    
+    cursor = conn.execute("""
+        SELECT COALESCE(ticket_count, 0) as total
+        FROM lottery_tickets 
+        WHERE user_id = ? AND week_number = ?
+    """, (user_id, current_week))
+    row = cursor.fetchone()
+    user_tickets = row[0] if row else 0
+    
+    now = datetime.now()
+    weekday = now.weekday()
+    
+    if weekday >= DRAW_DAY:
+        days_until = (7 - weekday + 0) % 7
+        if days_until == 0:
+            days_until = 7
+        next_draw = now + timedelta(days=days_until)
+        status_text = f"📅 Следующий розыгрыш: {next_draw.strftime('%d.%m.%Y')} (воскресенье)"
+    else:
+        status_text = f"📅 Продажа билетов до воскресенья"
+    
+    text = (
+        "🎟 <b>ЛОТЕРЕЯ</b>\n\n"
+        f"{status_text}\n\n"
+        f"💰 <b>Цена билета:</b> {LOTTERY_PRICE} LC\n"
+        f"🎫 <b>Продано билетов:</b> {tickets_total} шт.\n"
+        f"👤 <b>Твои билеты:</b> {user_tickets} шт.\n\n"
+        f"🏆 <b>ПРИЗЫ:</b>\n"
+        f"🥇 1 место: {PRIZES[0]} LC\n"
+        f"🥈 2 место: {PRIZES[1]} LC\n"
+        f"🥉 3 место: {PRIZES[2]} LC\n\n"
+        f"👇 Купить билеты командой:\n"
+        f"<code>/купить 1</code> — купить 1 билет\n"
+        f"<code>/купить 5</code> — купить 5 билетов"
+    )
+    
+    from keyboards.reply import get_main_menu_keyboard
+    await message.answer(text, reply_markup=get_main_menu_keyboard())
