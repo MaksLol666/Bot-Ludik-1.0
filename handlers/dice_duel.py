@@ -18,7 +18,9 @@ class DuelStates(StatesGroup):
     waiting_for_opponent = State()
 
 @router.message(F.text.lower().startswith("кости"))
+@require_subscription()
 async def create_duel(message: Message, state: FSMContext):
+    # ... остальной код
     """Создание дуэли"""
     parts = message.text.split()
     if len(parts) < 2:
