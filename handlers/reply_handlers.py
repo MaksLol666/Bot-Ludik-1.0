@@ -2,14 +2,16 @@ from aiogram import Router, F
 from aiogram.types import Message
 from aiogram.enums import ChatType
 
+from database_sqlite import db
 from handlers import (
     games, dice_duel, mines, lottery, profile, top, 
-    promo, business, donate, bonus, referral, blackjack, glc
+    promo, business, donate, bonus, referral, blackjack, glc, roulette
 )
 from keyboards.reply import (
     get_casino_reply_keyboard, get_business_reply_keyboard,
     get_top_reply_keyboard, get_glc_reply_keyboard, get_main_menu_keyboard
 )
+from keyboards.inline import get_back_button
 
 router = Router()
 
@@ -23,21 +25,25 @@ def is_private_chat(message: Message) -> bool:
 async def casino_reply(message: Message):
     if not is_private_chat(message):
         return
-    await message.answer("🎰 <b>Казино</b>\n\nВыбери игру:", reply_markup=get_casino_reply_keyboard())
+    await message.answer(
+        "🎰 <b>Казино</b>\n\nВыбери игру и напиши команду с ставкой.\n\n"
+        "Пример: <code>рул красное 1000</code>",
+        reply_markup=get_casino_reply_keyboard()
+    )
 
 @router.message(F.text == "🎟 Лотерея")
 async def lottery_reply(message: Message):
     if not is_private_chat(message):
         return
-    from handlers.lottery import lottery_menu
-    await lottery_menu(message)
+    from handlers.lottery import lottery_menu_reply
+    await lottery_menu_reply(message)
 
 @router.message(F.text == "💰 Донат")
 async def donate_reply(message: Message):
     if not is_private_chat(message):
         return
-    from handlers.donate import show_donate
-    await show_donate(message)
+    from handlers.donate import show_donate_reply
+    await show_donate_reply(message)
 
 @router.message(F.text == "🎁 Бонус")
 async def bonus_reply(message: Message):
@@ -50,27 +56,29 @@ async def bonus_reply(message: Message):
 async def business_reply(message: Message):
     if not is_private_chat(message):
         return
-    await message.answer("💼 <b>Бизнес</b>\n\nВыбери действие:", reply_markup=get_business_reply_keyboard())
+    from handlers.business import business_menu_reply
+    await business_menu_reply(message)
 
 @router.message(F.text == "👤 Моя стата")
 async def profile_reply(message: Message):
     if not is_private_chat(message):
         return
-    from handlers.profile import show_my_stats
-    await show_my_stats(message)
+    from handlers.profile import show_my_stats_reply
+    await show_my_stats_reply(message)
 
 @router.message(F.text == "🏆 Топы")
 async def top_reply(message: Message):
     if not is_private_chat(message):
         return
-    await message.answer("🏆 <b>Топы</b>\n\nВыбери категорию:", reply_markup=get_top_reply_keyboard())
+    from handlers.top import top_menu_reply
+    await top_menu_reply(message)
 
 @router.message(F.text == "🎫 Промокод")
 async def promo_reply(message: Message):
     if not is_private_chat(message):
         return
-    from handlers.promo import activate_promo_start_reply
-    await activate_promo_start_reply(message)
+    from handlers.promo import promo_start_reply
+    await promo_start_reply(message)
 
 @router.message(F.text == "👥 Рефералы")
 async def referral_reply(message: Message):
@@ -83,7 +91,8 @@ async def referral_reply(message: Message):
 async def glc_reply(message: Message):
     if not is_private_chat(message):
         return
-    await message.answer("💰 <b>GLC</b>\n\nВыбери действие:", reply_markup=get_glc_reply_keyboard())
+    from handlers.glc import glc_menu_reply
+    await glc_menu_reply(message)
 
 @router.message(F.text == "ℹ️ Инфо")
 async def info_reply(message: Message):
@@ -98,36 +107,63 @@ async def info_reply(message: Message):
 async def roulette_reply(message: Message):
     if not is_private_chat(message):
         return
-    from handlers.roulette import roulette_help_reply
-    await roulette_help_reply(message)
+    await message.answer(
+        "🃏 <b>Рулетка</b>\n\n"
+        "Напиши команду в формате:\n"
+        "<code>рул [ставка] [цвет/число]</code>\n\n"
+        "Примеры:\n"
+        "<code>рул красное 1000</code>\n"
+        "<code>рул черное 500</code>\n"
+        "<code>рул 7 2000</code>"
+    )
 
 @router.message(F.text == "🎰 Слоты")
 async def slots_reply(message: Message):
     if not is_private_chat(message):
         return
-    from handlers.games import slots_help_reply
-    await slots_help_reply(message)
+    await message.answer(
+        "🎰 <b>Слоты</b>\n\n"
+        "Напиши команду в формате:\n"
+        "<code>слоты [ставка]</code>\n\n"
+        "Пример:\n"
+        "<code>слоты 1000</code>"
+    )
 
 @router.message(F.text == "🎲 Кости")
 async def dice_reply(message: Message):
     if not is_private_chat(message):
         return
-    from handlers.dice_duel import dice_help_reply
-    await dice_help_reply(message)
+    await message.answer(
+        "🎲 <b>Кости (дуэль)</b>\n\n"
+        "Напиши команду в формате:\n"
+        "<code>кости [ставка]</code>\n\n"
+        "Пример:\n"
+        "<code>кости 1000</code>"
+    )
 
 @router.message(F.text == "💣 Мины")
 async def mines_reply(message: Message):
     if not is_private_chat(message):
         return
-    from handlers.mines import mines_help_reply
-    await mines_help_reply(message)
+    await message.answer(
+        "💣 <b>Мины</b>\n\n"
+        "Напиши команду в формате:\n"
+        "<code>мины [ставка]</code>\n\n"
+        "Пример:\n"
+        "<code>мины 1000</code>"
+    )
 
 @router.message(F.text == "🃏 Блэкджек")
 async def blackjack_reply(message: Message):
     if not is_private_chat(message):
         return
-    from handlers.blackjack import blackjack_help_reply
-    await blackjack_help_reply(message)
+    await message.answer(
+        "🃏 <b>Блэкджек (21)</b>\n\n"
+        "Напиши команду в формате:\n"
+        "<code>бджек [ставка]</code>\n\n"
+        "Пример:\n"
+        "<code>бджек 1000</code>"
+    )
 
 # ===== МЕНЮ БИЗНЕСА =====
 
@@ -156,8 +192,10 @@ async def buy_large_business_reply(message: Message):
 async def buy_paid_business_reply(message: Message):
     if not is_private_chat(message):
         return
-    from handlers.business import buy_business_reply
-    await buy_business_reply(message, "paid")
+    await message.answer(
+        "💎 <b>Платный бизнес</b>\n\n"
+        "Для покупки напиши /donate и выбери 'Бизнес 500₽'"
+    )
 
 @router.message(F.text == "💰 Собрать")
 async def collect_business_reply(message: Message):
