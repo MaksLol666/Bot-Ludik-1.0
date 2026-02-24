@@ -198,12 +198,19 @@ async def buy_status(callback: CallbackQuery):
     
     await callback.answer(f"✅ Ты купил статус {status['icon']} {status['name']}!", show_alert=True)
     
+    # Возвращаемся в магазин
     user = db.get_user(user_id)
     owned = get_user_glc_statuses(user_id)
     owned_keys = [s['status_key'] for s in owned]
     all_statuses = list(GLC_STATUSES.items())
     pages = [all_statuses[i:i+10] for i in range(0, len(all_statuses), 10)]
     await show_shop_page(callback.message, user, owned_keys, pages, 0)
+
+@router.callback_query(F.data == "glc_info")
+async def glc_info_callback(callback: CallbackQuery):
+    """Возврат к информации о GLC"""
+    await cmd_glc(callback.message)
+    await callback.answer()
 
 def get_user_glc_statuses(user_id: int):
     """Получить все купленные GLC статусы"""
@@ -246,3 +253,63 @@ def add_glc(user_id: int, amount: int, reason: str = ""):
     conn.commit()
     db.log_action(user_id, "glc", f"+{amount} | {reason}")
     return True
+
+# ===== НОВЫЕ ФУНКЦИИ ДЛЯ REPLY КНОПОК =====
+
+async def glc_menu_reply(message: Message):
+    """Меню GLC для Reply кнопки"""
+    user_id = message.from_user.id
+    user = db.get_user(user_id)
+    
+    if not user:
+        await message.answer("❌ Ты не зарегистрирован!")
+        return
+    
+    owned_statuses = get_user_glc_statuses(user_id)
+    
+    status_text = "Твои статусы:\n"
+    if owned_statuses:
+        for s in owned_statuses:
+            status_text += f"• {s['status_icon']} {s['status_name']}\n"
+    else:
+        status_text = "У тебя нет купленных статусов\n"
+    
+    text = (
+        f"💰 <b>GLC — Премиальная валюта</b>\n\n"
+        f"Твой баланс GLC: {user['balance_glc']} #GLC\n\n"
+        f"{status_text}\n"
+        f"<b>Как получить GLC:</b>\n"
+        f"• 👥 За реферала: +100 GLC\n"
+        f"• 💵 За донат: +10 GLC за каждые 10₽\n"
+        f"• 📅 В ежедневном бонусе: шанс получить GLC\n"
+        f"• 🔥 За серию побед (5+): +50 GLC\n\n"
+        f"<b>На что потратить GLC:</b>\n"
+        f"• 👑 Уникальные статусы (магазин ниже)"
+    )
+    
+    from keyboards.reply import get_glc_reply_keyboard
+    await message.answer(text, reply_markup=get_glc_reply_keyboard())
+
+async def glc_shop_reply(message: Message):
+    """Магазин статусов для Reply кнопки"""
+    user_id = message.from_user.id
+    user = db.get_user(user_id)
+    owned = get_user_glc_statuses(user_id)
+    owned_keys = [s['status_key'] for s in owned]
+    
+    all_statuses = list(GLC_STATUSES.items())
+    pages = [all_statuses[i:i+10] for i in range(0, len(all_statuses), 10)]
+    
+    text = f"💰 <b>Магазин статусов</b>\n\nТвой баланс GLC: {user['balance_glc']}\n\n"
+    text += f"<b>Страница 1/{len(pages)}</b>\n\n"
+    
+    for key, status in pages[0]:
+        if key in owned_keys:
+            text += f"✅ {status['icon']} {status['name']} — {status['price']} GLC (Куплено)\n"
+        else:
+            text += f"⬜ {status['icon']} {status['name']} — {status['price']} GLC\n"
+    
+    text += "\nДля покупки используй команду /buy_status [название]"
+    
+    from keyboards.reply import get_glc_reply_keyboard
+    await message.answer(text, reply_markup=get_glc_reply_keyboard())
