@@ -157,3 +157,21 @@ async def check_subscription(callback: CallbackQuery):
             await callback.message.edit_text("🎮 Игровой зал:", reply_markup=get_inline_main_menu())
     except:
         await callback.answer("❌ Ошибка проверки", show_alert=True)
+
+# ===== НОВАЯ ФУНКЦИЯ ДЛЯ REPLY КНОПКИ =====
+
+async def show_info_reply(message: Message):
+    """Показать информацию о боте для Reply кнопки"""
+    info_text = (
+        f"<b>Информация о боте \"Лудик {BOT_VERSION}\"</b>\n\n"
+        f"👑 <b>Владелец:</b> {ADMIN_USERNAME}\n"
+        f"📅 <b>Релиз:</b> {BOT_RELEASE_DATE}\n"
+        f"📊 <b>Версия:</b> {BOT_VERSION}\n\n"
+        f"⚠️ <b>ВНИМАНИЕ:</b>\n"
+        f"• Денежные средства не возвращаются.\n"
+        f"• Вывод средств не предусмотрен.\n"
+        f"• Играйте ответственно!"
+    )
+    
+    from keyboards.reply import get_main_menu_keyboard
+    await message.answer(info_text, reply_markup=get_main_menu_keyboard())
