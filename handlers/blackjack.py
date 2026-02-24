@@ -6,7 +6,9 @@ from aiogram.fsm.state import State, StatesGroup
 
 from database_sqlite import db
 from handlers.status import update_user_status
+from handlers.subscription_check import require_subscription
 from config import MIN_BET, MAX_BET
+from keyboards.inline import get_back_button
 
 router = Router()
 
@@ -36,7 +38,7 @@ def calculate_hand(hand):
     total = 0
     aces = 0
     for card in hand:
-        value = card[:-1]  # убираем масть
+        value = card[:-1]
         if value == 'A':
             aces += 1
             total += 11
@@ -53,8 +55,8 @@ def hand_to_string(hand):
     """Преобразование руки в строку"""
     return ' '.join(hand)
 
-@router.message(F.text.lower().startswith("бджек"))
-@router.message(F.text.lower().startswith("blackjack"))
+@router.message(F.text.lower().startswith(("бджек", "blackjack")))
+@require_subscription()
 async def start_blackjack(message: Message, state: FSMContext):
     parts = message.text.split()
     if len(parts) < 2:
@@ -90,15 +92,18 @@ async def start_blackjack(message: Message, state: FSMContext):
         await message.answer(f"❌ Максимальная ставка: {MAX_BET} LC")
         return
     
+    # Списываем ставку
     db.update_balance(user_id, -bet)
     
+    # Создаем игру
     deck = create_deck()
     player_hand = [deck.pop(), deck.pop()]
     dealer_hand = [deck.pop(), deck.pop()]
     
     player_score = calculate_hand(player_hand)
-    dealer_score = calculate_hand([dealer_hand[0]])
+    dealer_score = calculate_hand([dealer_hand[0]])  # только первая карта дилера
     
+    # Проверка на блэкджек
     if player_score == 21:
         win_amount = int(bet * 2.5)
         db.update_balance(user_id, win_amount)
@@ -113,6 +118,7 @@ async def start_blackjack(message: Message, state: FSMContext):
         )
         return
     
+    # Сохраняем состояние
     await state.set_state(BlackjackStates.playing)
     await state.update_data(
         bet=bet,
@@ -148,10 +154,12 @@ async def blackjack_action(callback: CallbackQuery, state: FSMContext):
     user_id = callback.from_user.id
     
     if action == "hit":
+        # Игрок берет карту
         player_hand.append(deck.pop())
         player_score = calculate_hand(player_hand)
         
         if player_score > 21:
+            # Перебор - игрок проиграл
             db.add_game_stat(user_id, "blackjack", False, bet, 0)
             update_user_status(user_id)
             
@@ -165,6 +173,7 @@ async def blackjack_action(callback: CallbackQuery, state: FSMContext):
             await callback.answer()
             return
         
+        # Обновляем состояние
         await state.update_data(player_hand=player_hand, deck=deck)
         
         from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -184,13 +193,16 @@ async def blackjack_action(callback: CallbackQuery, state: FSMContext):
         await callback.answer()
         
     elif action == "stand":
+        # Игрок останавливается - ходит дилер
         player_score = calculate_hand(player_hand)
         dealer_score = calculate_hand(dealer_hand)
         
+        # Дилер берет карты пока не наберет 17+
         while dealer_score < 17:
             dealer_hand.append(deck.pop())
             dealer_score = calculate_hand(dealer_hand)
         
+        # Определяем результат
         if dealer_score > 21:
             win_amount = bet * 2
             db.update_balance(user_id, win_amount)
@@ -219,3 +231,23 @@ async def blackjack_action(callback: CallbackQuery, state: FSMContext):
         )
         await state.clear()
         await callback.answer()
+
+@router.callback_query(F.data == "game_blackjack")
+async def blackjack_help(callback: CallbackQuery):
+    """Помощь по блэкджеку"""
+    text = (
+        "🃏 <b>Блэкджек (21)</b>\n\n"
+        "<b>Как играть:</b>\n"
+        "Напиши в чат команду:\n"
+        "<code>бджек [ставка]</code>\n\n"
+        "<b>Пример:</b>\n"
+        "<code>бджек 1000</code>\n\n"
+        "<b>Правила:</b>\n"
+        "• Нужно набрать 21 или ближе к 21\n"
+        "• Карты от 2 до 10 - по номиналу\n"
+        "• Валет, Дама, Король - 10 очков\n"
+        "• Туз - 11 или 1 очко\n"
+        "• Блэкджек (21 с двух карт) дает выигрыш x2.5"
+    )
+    await callback.message.edit_text(text, reply_markup=get_back_button())
+    await callback.answer()
