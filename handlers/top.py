@@ -4,7 +4,7 @@ from aiogram.filters import Command
 
 from database_sqlite import db
 from handlers.status import get_display_name
-from keyboards.inline import get_back_button
+from keyboards.inline import get_back_button, get_top_keyboard
 
 router = Router()
 
@@ -90,8 +90,62 @@ async def top_menu(callback: CallbackQuery):
         "🏆 <b>Топы игроков</b>\n\n"
         "Выбери категорию:"
     )
-    from keyboards.inline import get_top_keyboard
     await callback.message.edit_text(text, reply_markup=get_top_keyboard())
+    await callback.answer()
+
+@router.callback_query(F.data.startswith("top_"))
+async def top_category_callback(callback: CallbackQuery):
+    """Обработка выбора категории топа"""
+    top_type = callback.data.replace("top_", "")
+    
+    if top_type == "balance":
+        rows = await get_top_balance(10)
+        text = "💰 <b>Топ богачей</b>\n\n"
+        for i, row in enumerate(rows, 1):
+            display_name = get_display_name(row[0], row[1] or f"id{row[0]}")
+            text += f"{i}. {display_name} — {row[2]} LC\n"
+    elif top_type == "roulette":
+        rows = await get_top_game("roulette", 10)
+        text = "🃏 <b>Топ рулетки</b>\n\n"
+        for i, row in enumerate(rows, 1):
+            display_name = get_display_name(row[0], row[1] or f"id{row[0]}")
+            text += f"{i}. {display_name} — {row[3]} LC выиграно\n"
+    elif top_type == "slots":
+        rows = await get_top_game("slots", 10)
+        text = "🎰 <b>Топ слотов</b>\n\n"
+        for i, row in enumerate(rows, 1):
+            display_name = get_display_name(row[0], row[1] or f"id{row[0]}")
+            text += f"{i}. {display_name} — {row[3]} LC выиграно\n"
+    elif top_type == "dice":
+        rows = await get_top_game("dice", 10)
+        text = "🎲 <b>Топ костей</b>\n\n"
+        for i, row in enumerate(rows, 1):
+            display_name = get_display_name(row[0], row[1] or f"id{row[0]}")
+            text += f"{i}. {display_name} — {row[3]} LC выиграно\n"
+    elif top_type == "mines":
+        rows = await get_top_game("mines", 10)
+        text = "💣 <b>Топ мин</b>\n\n"
+        for i, row in enumerate(rows, 1):
+            display_name = get_display_name(row[0], row[1] or f"id{row[0]}")
+            text += f"{i}. {display_name} — {row[3]} LC выиграно\n"
+    elif top_type == "lottery":
+        rows = await get_top_game("lottery", 10)
+        text = "🎟 <b>Топ лотереи</b>\n\n"
+        for i, row in enumerate(rows, 1):
+            display_name = get_display_name(row[0], row[1] or f"id{row[0]}")
+            text += f"{i}. {display_name} — {row[3]} LC выиграно\n"
+    elif top_type == "blackjack":
+        rows = await get_top_game("blackjack", 10)
+        text = "🃏 <b>Топ блэкджека</b>\n\n"
+        for i, row in enumerate(rows, 1):
+            display_name = get_display_name(row[0], row[1] or f"id{row[0]}")
+            text += f"{i}. {display_name} — {row[3]} LC выиграно\n"
+    else:
+        await callback.message.answer("❌ Неизвестный топ")
+        await callback.answer()
+        return
+    
+    await callback.message.edit_text(text, reply_markup=get_back_button())
     await callback.answer()
 
 async def show_top_command(message: Message, cmd: str):
@@ -144,7 +198,7 @@ async def show_top_command(message: Message, cmd: str):
     
     await message.edit_text(text, reply_markup=get_back_button())
 
-# ===== НОВЫЕ ФУНКЦИИ ДЛЯ REPLY КНОПОК =====
+# ===== ФУНКЦИИ ДЛЯ REPLY КНОПОК =====
 
 async def top_menu_reply(message: Message):
     """Меню выбора топа для Reply кнопки"""
