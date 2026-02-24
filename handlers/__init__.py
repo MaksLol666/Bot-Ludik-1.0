@@ -15,11 +15,12 @@ from . import admin
 from . import transfers
 from . import blackjack
 from . import glc
-from . import roulette  # ДОБАВИТЬ
+from . import roulette  
+from . import reply_handlers 
 
 __all__ = [
     'start', 'games', 'dice_duel', 'mines', 'lottery',
     'profile', 'top', 'status', 'promo', 'business',
     'donate', 'bonus', 'referral', 'admin', 'transfers',
-    'blackjack', 'glc', 'roulette'  # ДОБАВИТЬ
+    'blackjack', 'glc', 'roulette', 'reply_handlers'
 ]
