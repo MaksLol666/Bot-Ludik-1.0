@@ -11,7 +11,7 @@ from database_sqlite import db
 from handlers import (
     start, games, dice_duel, mines, lottery, profile, top, status,
     promo, business, donate, bonus, referral, admin, transfers,
-    blackjack, glc, roulette  # ДОБАВИТЬ
+    blackjack, glc, roulette, reply_handlers  # ДОБАВИТЬ reply_handlers
 )
 from utils.promo_setup import create_start_promos
 
@@ -47,6 +47,7 @@ async def main():
     )
     dp = Dispatcher(storage=MemoryStorage())
     
+    # Роутеры
     dp.include_router(start.router)
     dp.include_router(games.router)
     dp.include_router(dice_duel.router)
@@ -64,7 +65,8 @@ async def main():
     dp.include_router(transfers.router)
     dp.include_router(blackjack.router)
     dp.include_router(glc.router)
-    dp.include_router(roulette.router)  # ДОБАВИТЬ
+    dp.include_router(roulette.router)
+    dp.include_router(reply_handlers.router)  # ДОБАВИТЬ
     
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
