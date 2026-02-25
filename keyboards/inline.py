@@ -15,7 +15,7 @@ def get_start_keyboard() -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 def get_main_menu() -> InlineKeyboardMarkup:
-    """Главное меню"""
+    """Главное меню (инлайн)"""
     builder = InlineKeyboardBuilder()
     builder.row(
         InlineKeyboardButton(text="🎰 Казино", callback_data="casino_menu"),
@@ -105,7 +105,7 @@ def get_back_button() -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 def get_glc_shop_keyboard(page: int = 0, total_pages: int = 1) -> InlineKeyboardMarkup:
-    """Клавиатура для GLC магазина"""
+    """Клавиатура для GLC магазина с навигацией по страницам"""
     builder = InlineKeyboardBuilder()
     
     from handlers.glc import GLC_STATUSES
@@ -120,6 +120,7 @@ def get_glc_shop_keyboard(page: int = 0, total_pages: int = 1) -> InlineKeyboard
                 callback_data=f"buy_status_{key}"
             ))
     
+    # Кнопки навигации по страницам
     nav_buttons = []
     if page > 0:
         nav_buttons.append(InlineKeyboardButton(text="◀️", callback_data=f"shop_page_{page-1}"))
@@ -127,9 +128,16 @@ def get_glc_shop_keyboard(page: int = 0, total_pages: int = 1) -> InlineKeyboard
         nav_buttons.append(InlineKeyboardButton(text="▶️", callback_data=f"shop_page_{page+1}"))
     
     if nav_buttons:
-        builder.row(*nav_buttons)
+        # Добавляем информацию о текущей странице
+        page_info = InlineKeyboardButton(text=f"{page+1}/{total_pages}", callback_data="noop")
+        if len(nav_buttons) == 2:
+            builder.row(nav_buttons[0], page_info, nav_buttons[1])
+        elif len(nav_buttons) == 1 and page == 0:
+            builder.row(page_info, nav_buttons[0])
+        elif len(nav_buttons) == 1 and page == total_pages - 1:
+            builder.row(nav_buttons[0], page_info)
     
-    builder.row(InlineKeyboardButton(text="◀️ Назад", callback_data="glc_info"))
+    builder.row(InlineKeyboardButton(text="◀️ Назад в GLC", callback_data="glc_info"))
     
     return builder.as_markup()
 
@@ -228,3 +236,38 @@ async def info_callback(callback: CallbackQuery):
 async def check_sub_callback(callback: CallbackQuery):
     from handlers.start import check_subscription
     await check_subscription(callback)
+
+@router.callback_query(F.data == "my_stats")
+async def my_stats_callback(callback: CallbackQuery):
+    from handlers.profile import show_my_stats
+    await show_my_stats(callback)
+
+@router.callback_query(F.data == "get_bonus")
+async def get_bonus_callback(callback: CallbackQuery):
+    from handlers.bonus import get_bonus
+    await get_bonus(callback)
+
+@router.callback_query(F.data == "business_menu")
+async def business_menu_callback(callback: CallbackQuery):
+    from handlers.business import business_menu
+    await business_menu(callback)
+
+@router.callback_query(F.data == "lottery_menu")
+async def lottery_menu_callback(callback: CallbackQuery):
+    from handlers.lottery import lottery_menu
+    await lottery_menu(callback)
+
+@router.callback_query(F.data == "activate_promo")
+async def activate_promo_callback(callback: CallbackQuery):
+    from handlers.promo import activate_promo_start
+    await activate_promo_start(callback)
+
+@router.callback_query(F.data == "referral_menu")
+async def referral_menu_callback(callback: CallbackQuery):
+    from handlers.referral import referral_menu
+    await referral_menu(callback)
+
+# Заглушка для кнопок без действия
+@router.callback_query(F.data == "noop")
+async def noop_callback(callback: CallbackQuery):
+    await callback.answer()
