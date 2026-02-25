@@ -4,7 +4,7 @@ import random
 
 from database_sqlite import db
 from handlers.status import update_user_status
-from handlers.subscription_check import require_subscription
+from handlers.subscription_check import require_subscription  # ДОБАВИТЬ ЭТОТ ИМПОРТ!
 from config import MIN_BET, MAX_BET
 from keyboards.inline import get_back_button
 
