@@ -7,6 +7,7 @@ from aiogram.fsm.state import State, StatesGroup
 
 from database_sqlite import db
 from handlers.status import update_user_status
+from handlers.subscription_check import require_subscription  # ВАЖНО: ДОБАВИТЬ ЭТОТ ИМПОРТ!
 from config import MIN_BET, MAX_BET
 
 router = Router()
@@ -20,7 +21,6 @@ class DuelStates(StatesGroup):
 @router.message(F.text.lower().startswith("кости"))
 @require_subscription()
 async def create_duel(message: Message, state: FSMContext):
-    # ... остальной код
     """Создание дуэли"""
     parts = message.text.split()
     if len(parts) < 2:
