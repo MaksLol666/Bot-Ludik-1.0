@@ -6,6 +6,7 @@ from aiogram.fsm.state import State, StatesGroup
 
 from database_sqlite import db
 from handlers.status import update_user_status
+from handlers.subscription_check import require_subscription  # ДОБАВИТЬ ЭТОТ ИМПОРТ!
 from config import MIN_BET, MAX_BET
 
 router = Router()
@@ -28,7 +29,6 @@ class MinesStates(StatesGroup):
 @router.message(F.text.lower().startswith("мины"))
 @require_subscription()
 async def start_mines(message: Message, state: FSMContext):
-    # ... остальной код
     parts = message.text.split()
     if len(parts) < 2:
         await message.answer("❌ Формат: мины [ставка]")
@@ -270,4 +270,22 @@ async def exit_game(callback: CallbackQuery, state: FSMContext):
         await callback.message.edit_text("👋 Игра завершена")
     
     await state.clear()
+    await callback.answer()
+
+async def mines_help(callback: CallbackQuery):
+    """Помощь по минам"""
+    text = (
+        "💣 <b>Мины</b>\n\n"
+        "<b>Как играть:</b>\n"
+        "Напиши в чат команду:\n"
+        "<code>мины [ставка]</code>\n\n"
+        "<b>Пример:</b>\n"
+        "<code>мины 1000</code>\n\n"
+        "<b>Правила:</b>\n"
+        "• Открывай клетки и забирай выигрыш\n"
+        "• Чем больше клеток открыто, тем выше множитель\n"
+        "• Если попадешь на мину - проигрыш"
+    )
+    from keyboards.inline import get_back_button
+    await callback.message.edit_text(text, reply_markup=get_back_button())
     await callback.answer()
