@@ -4,6 +4,7 @@ import random
 
 from database_sqlite import db
 from handlers.status import update_user_status
+from handlers.subscription_check import require_subscription  # ДОБАВИТЬ ЭТОТ ИМПОРТ!
 from config import MIN_BET, MAX_BET
 from keyboards.inline import get_back_button
 
@@ -156,7 +157,6 @@ def get_result_info(result: int) -> dict:
 @router.message(F.text.lower().startswith(("рул", "рулетка")))
 @require_subscription()
 async def process_roulette(message: Message):
-    # ... остальной код
     """Обработчик рулетки"""
     # Парсим сообщение
     text = message.text.lower()
